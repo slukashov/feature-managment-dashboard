@@ -7,9 +7,9 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <Version>1.0.1</Version>
+        <Version>1.0.1.1</Version>
         <Authors>slukashov</Authors>
-        <Description>Db Feature Management with React UI</Description>
+        <Description>Feature Management Dashboard for ASP.NET Core</Description>
         <RepositoryType>git</RepositoryType>
         <PackageTags>feature-flags;feature-management;feature-toggles;aspnetcore;
             efcore;react;ui;dashboard;admin;microsoft-feature-management</PackageTags>
