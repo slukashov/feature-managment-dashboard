@@ -1,0 +1,54 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <IsPackable>true</IsPackable>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+        <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferencesInPackage</TargetsForTfmSpecificBuildOutput>
+        <SpaRoot>client-app/</SpaRoot>
+        <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+        <SkipClientAppBuild Condition="'$(SkipClientAppBuild)' == ''">false</SkipClientAppBuild>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
+        <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.8" />
+    </ItemGroup>
+    
+    <ItemGroup>
+        <Content Remove="$(SpaRoot)**" />
+        <None Remove="$(SpaRoot)**" />
+        <None Include="$(SpaRoot)**" Exclude="$(SpaRoot)node_modules\**" />
+        <None Include="README.md" Pack="true" PackagePath="\" />
+    </ItemGroup>
+    <ItemGroup>
+        <EmbeddedResource Include="$(SpaRoot)dist/**/*" />
+        <EmbeddedResource Include="..\FeatureManagement.Dashboard.Persistence\Database\Scripts\create_feature_management_tables.*.sql"
+                          Link="Database/Scripts/%(Filename)%(Extension)" />
+    </ItemGroup>
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>FeatureManagement.Dashboard.Tests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\FeatureManagement.Dashboard.Infrastructure\FeatureManagement.Dashboard.Infrastructure.csproj" />
+      <ProjectReference Include="..\FeatureManagement.Dashboard.Models\FeatureManagement.Dashboard.Models.csproj" />
+      <ProjectReference Include="..\FeatureManagement.Dashboard.Persistence\FeatureManagement.Dashboard.Persistence.csproj" />
+    </ItemGroup>
+    <Target Name="BuildReactApp" BeforeTargets="GenerateEmbeddedFilesManifest" Condition="'$(SkipClientAppBuild)' != 'true'">
+        <Message Importance="high" Text="Installing NPM packages..." />
+        <Exec Command="npm install" WorkingDirectory="$(SpaRoot)" />
+
+        <Message Importance="high" Text="Building React App..." />
+        <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+    </Target>
+
+    <Target Name="IncludeProjectReferencesInPackage" DependsOnTargets="ResolveReferences">
+        <ItemGroup>
+            <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths->WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))" />
+        </ItemGroup>
+    </Target>
+
+</Project>

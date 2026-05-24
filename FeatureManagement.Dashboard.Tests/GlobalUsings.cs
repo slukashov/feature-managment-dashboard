@@ -1,0 +1,13 @@
+global using Microsoft.AspNetCore.Authentication;
+global using FeatureManagement.Dashboard.Extensions;
+global using Microsoft.AspNetCore.Builder;
+global using Microsoft.AspNetCore.Http;
+global using Microsoft.AspNetCore.TestHost;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.EntityFrameworkCore.Storage;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.Logging;
+global using Microsoft.Extensions.Options;
+global using Microsoft.FeatureManagement;
+global using System.Text.Encodings.Web;
+global using Xunit;
