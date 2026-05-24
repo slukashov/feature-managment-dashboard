@@ -1,0 +1,16 @@
+## .NET
+bin/
+obj/
+/packages/
+
+## Node (client-app)
+**/node_modules/
+**/dist/
+**/coverage/
+
+## IDE and tooling
+riderModule.iml
+/_ReSharper.Caches/
+.idea/
+.DS_Store
+build/
