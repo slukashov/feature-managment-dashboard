@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    
+    <ItemGroup>
+        <PackageReference Include="FluentValidation" Version="12.1.1"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.8"/>
+        <PackageReference Include="Microsoft.FeatureManagement.AspNetCore" Version="4.5.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\FeatureManagement.Dashboard.Models\FeatureManagement.Dashboard.Models.csproj"/>
+    </ItemGroup>
+
+</Project>

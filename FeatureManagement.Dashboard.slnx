@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Solution items/">
+    <File Path="Directory.Build.props" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="FeatureManagement.Dashboard.Infrastructure/FeatureManagement.Dashboard.Infrastructure.csproj" />
+    <Project Path="FeatureManagement.Dashboard.Models/FeatureManagement.Dashboard.Models.csproj" />
+    <Project Path="FeatureManagement.Dashboard.Persistence/FeatureManagement.Dashboard.Persistence.csproj" />
+    <Project Path="FeatureManagement.Dashboard/FeatureManagement.Dashboard.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="FeatureManagement.Dashboard.Tests/FeatureManagement.Dashboard.Tests.csproj" />
+  </Folder>
+</Solution>
