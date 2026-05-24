@@ -6,7 +6,7 @@
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferencesInPackage</TargetsForTfmSpecificBuildOutput>
         <SpaRoot>client-app/</SpaRoot>
-        <RepositoryUrl>https://github.com/yourusername/FeatureManagement.Dashboard</RepositoryUrl>
+        <RepositoryUrl>https://github.com/slukashov/feature-managment-dashboard.git</RepositoryUrl>
         <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
         <SkipClientAppBuild Condition="'$(SkipClientAppBuild)' == ''">false</SkipClientAppBuild>
     </PropertyGroup>
