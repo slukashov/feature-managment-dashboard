@@ -6,6 +6,7 @@
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferencesInPackage</TargetsForTfmSpecificBuildOutput>
         <SpaRoot>client-app/</SpaRoot>
+        <RepositoryUrl>https://github.com/yourusername/FeatureManagement.Dashboard</RepositoryUrl>
         <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
         <SkipClientAppBuild Condition="'$(SkipClientAppBuild)' == ''">false</SkipClientAppBuild>
     </PropertyGroup>
@@ -19,39 +20,39 @@
         <Content Remove="$(SpaRoot)**" />
         <None Remove="$(SpaRoot)**" />
         <None Include="$(SpaRoot)**" Exclude="$(SpaRoot)node_modules\**" />
-        <None Include="README.md" Pack="true" PackagePath="\" />
+        <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
     </ItemGroup>
+
     <ItemGroup>
-        <!-- dist/**/* is included statically only when the build is skipped (pre-built dist expected to exist) -->
-        <EmbeddedResource Include="$(SpaRoot)dist/**/*" Condition="'$(SkipClientAppBuild)' == 'true'" />
+        <EmbeddedResource Include="$(SpaRoot)dist\**\*" Link="client-app/dist/%(RecursiveDir)%(Filename)%(Extension)" />
         <EmbeddedResource Include="..\FeatureManagement.Dashboard.Persistence\Database\Scripts\create_feature_management_tables.*.sql"
                           Link="Database/Scripts/%(Filename)%(Extension)" />
     </ItemGroup>
 
-    <!-- When the React app is built as part of this build, add dist files dynamically after the build completes -->
-    <Target Name="IncludeDistInEmbeddedResources" AfterTargets="BuildReactApp" BeforeTargets="GenerateEmbeddedFilesManifest"
-            Condition="'$(SkipClientAppBuild)' != 'true'">
-        <ItemGroup>
-            <EmbeddedResource Include="$(SpaRoot)dist/**/*" />
-        </ItemGroup>
-    </Target>
-    <ItemGroup>
-        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-            <_Parameter1>FeatureManagement.Dashboard.Tests</_Parameter1>
-        </AssemblyAttribute>
-    </ItemGroup>
-    <ItemGroup>
-      <ProjectReference Include="..\FeatureManagement.Dashboard.Infrastructure\FeatureManagement.Dashboard.Infrastructure.csproj" />
-      <ProjectReference Include="..\FeatureManagement.Dashboard.Models\FeatureManagement.Dashboard.Models.csproj" />
-      <ProjectReference Include="..\FeatureManagement.Dashboard.Persistence\FeatureManagement.Dashboard.Persistence.csproj" />
-    </ItemGroup>
-    <Target Name="BuildReactApp" BeforeTargets="GenerateEmbeddedFilesManifest" Condition="'$(SkipClientAppBuild)' != 'true'">
+    <Target Name="BuildReactApp" BeforeTargets="Build" Condition="'$(SkipClientAppBuild)' != 'true'">
         <Message Importance="high" Text="Installing NPM packages..." />
         <Exec Command="npm install" WorkingDirectory="$(SpaRoot)" />
 
         <Message Importance="high" Text="Building React App..." />
         <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
     </Target>
+
+    <Target Name="ValidateSpaDistForPack" BeforeTargets="Pack"
+            Condition="'$(SkipClientAppBuild)' == 'true' and !Exists('$(SpaRoot)dist/index.html')">
+        <Error Text="SkipClientAppBuild=true requires prebuilt UI assets in $(SpaRoot)dist. Run npm run build in client-app or remove SkipClientAppBuild=true for packing." />
+    </Target>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+            <_Parameter1>FeatureManagement.Dashboard.Tests</_Parameter1>
+        </AssemblyAttribute>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\FeatureManagement.Dashboard.Infrastructure\FeatureManagement.Dashboard.Infrastructure.csproj" />
+      <ProjectReference Include="..\FeatureManagement.Dashboard.Models\FeatureManagement.Dashboard.Models.csproj" />
+      <ProjectReference Include="..\FeatureManagement.Dashboard.Persistence\FeatureManagement.Dashboard.Persistence.csproj" />
+    </ItemGroup>
 
     <Target Name="IncludeProjectReferencesInPackage" DependsOnTargets="ResolveReferences">
         <ItemGroup>
