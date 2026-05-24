@@ -106,7 +106,30 @@ public static class FeatureManagementUiExtensions
     public IApplicationBuilder UseFeatureManagementUi(string routePrefix = "/feature-flags")
     {
       var assembly = typeof(FeatureManagementUiExtensions).GetTypeInfo().Assembly;
-      var embeddedFileProvider = new ManifestEmbeddedFileProvider(assembly, "client-app/dist");
+
+      ManifestEmbeddedFileProvider? embeddedFileProvider = null;
+      try
+      {
+        embeddedFileProvider = new ManifestEmbeddedFileProvider(assembly, "client-app/dist");
+      }
+      catch (InvalidOperationException)
+      {
+        // In test/CI runs the embedded SPA payload may be intentionally absent.
+      }
+
+      if (embeddedFileProvider is null)
+      {
+        app.Map(routePrefix, builder =>
+        {
+          builder.Run(async context =>
+          {
+            context.Response.ContentType = "text/html";
+            await context.Response.WriteAsync("<html><body><h1>Feature Management UI is not embedded in this build.</h1></body></html>");
+          });
+        });
+
+        return app;
+      }
 
       app.UseStaticFiles(new StaticFileOptions
       {
