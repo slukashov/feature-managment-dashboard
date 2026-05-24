@@ -3,7 +3,6 @@
     <PropertyGroup>
         <IsPackable>true</IsPackable>
         <PackageReadmeFile>README.md</PackageReadmeFile>
-        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferencesInPackage</TargetsForTfmSpecificBuildOutput>
         <SpaRoot>client-app/</SpaRoot>
