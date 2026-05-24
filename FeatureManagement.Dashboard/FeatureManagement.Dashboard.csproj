@@ -22,10 +22,19 @@
         <None Include="README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
     <ItemGroup>
-        <EmbeddedResource Include="$(SpaRoot)dist/**/*" />
+        <!-- dist/**/* is included statically only when the build is skipped (pre-built dist expected to exist) -->
+        <EmbeddedResource Include="$(SpaRoot)dist/**/*" Condition="'$(SkipClientAppBuild)' == 'true'" />
         <EmbeddedResource Include="..\FeatureManagement.Dashboard.Persistence\Database\Scripts\create_feature_management_tables.*.sql"
                           Link="Database/Scripts/%(Filename)%(Extension)" />
     </ItemGroup>
+
+    <!-- When the React app is built as part of this build, add dist files dynamically after the build completes -->
+    <Target Name="IncludeDistInEmbeddedResources" AfterTargets="BuildReactApp" BeforeTargets="GenerateEmbeddedFilesManifest"
+            Condition="'$(SkipClientAppBuild)' != 'true'">
+        <ItemGroup>
+            <EmbeddedResource Include="$(SpaRoot)dist/**/*" />
+        </ItemGroup>
+    </Target>
     <ItemGroup>
         <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
             <_Parameter1>FeatureManagement.Dashboard.Tests</_Parameter1>
