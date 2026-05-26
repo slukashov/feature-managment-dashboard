@@ -10,7 +10,14 @@
         <Version>1.0.1.1</Version>
         <Authors>slukashov</Authors>
         <Description>Feature Management Dashboard for ASP.NET Core</Description>
+        <PackageProjectUrl>https://github.com/slukashov/feature-managment-dashboard</PackageProjectUrl>
+        <PackageRepositoryUrl>https://github.com/slukashov/feature-managment-dashboard</PackageRepositoryUrl>
+        <RepositoryUrl>https://github.com/slukashov/feature-managment-dashboard</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <PackageTags>feature-flags;feature-management;feature-toggles;aspnetcore;
             efcore;react;ui;dashboard;admin;microsoft-feature-management</PackageTags>
     </PropertyGroup>

@@ -32,3 +32,5 @@ TestResults/
 *.iobj
 *.ipdb
 nupkgs-local/
+nupkgs-ci-check/
+tmp-nupkg-check/

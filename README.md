@@ -2,6 +2,8 @@
 
 `FeatureManagement.Dashboard` provides a database-backed feature flag dashboard for ASP.NET Core with an embedded React UI, minimal API endpoints, and integration with `Microsoft.FeatureManagement`.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+
 ## Overview
 
 The solution is organized into layered projects:
@@ -14,6 +16,14 @@ The solution is organized into layered projects:
 - `FeatureManagement.Dashboard/client-app` - React dashboard UI
 
 Authorization is host-owned via ASP.NET Core `IAuthorizationRequirement`.
+
+## Open Source Project Info
+
+- License: [MIT](./LICENSE)
+- Changelog: [CHANGELOG.md](./CHANGELOG.md)
+- Contributing guide: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Security policy: [SECURITY.md](./SECURITY.md)
+- Community standards: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
 
 ## Key Features
 
