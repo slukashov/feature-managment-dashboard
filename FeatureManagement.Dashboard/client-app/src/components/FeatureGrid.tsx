@@ -20,13 +20,16 @@ import SearchIcon from '@mui/icons-material/Search';
 import { FeatureFlag } from '../types/featureFlags';
 
 interface FeatureGridProps {
-    flags: FeatureFlag[];
-    isLoading: boolean;
-    onToggle: (flag: FeatureFlag) => void;
-    onEdit: (flag: FeatureFlag) => void;
+    readonly flags: FeatureFlag[];
+    readonly isLoading: boolean;
+    readonly onToggle: (flag: FeatureFlag) => void;
+    readonly onEdit: (flag: FeatureFlag) => void;
+    readonly onHistory: (flag: FeatureFlag) => void;
+    readonly onDelete: (flag: FeatureFlag) => void;
+    readonly onActivity: (flag: FeatureFlag) => void;
 }
 
-export default function FeatureGrid({ flags, isLoading, onToggle, onEdit }: FeatureGridProps) {
+export default function FeatureGrid({ flags, isLoading, onToggle, onEdit, onHistory, onDelete, onActivity }: FeatureGridProps) {
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState<'all' | 'enabled' | 'disabled'>('all');
 
@@ -39,7 +42,13 @@ export default function FeatureGrid({ flags, isLoading, onToggle, onEdit }: Feat
                 status === 'all' ||
                 (status === 'enabled' && isEnabled) ||
                 (status === 'disabled' && !isEnabled);
-            const matchesSearch = !searchValue || flag.name.toLowerCase().includes(searchValue);
+            const tagsSearch = flag.tags.join(' ').toLowerCase();
+            const ownerSearch = flag.owner.toLowerCase();
+            const matchesSearch =
+                !searchValue ||
+                flag.name.toLowerCase().includes(searchValue) ||
+                ownerSearch.includes(searchValue) ||
+                tagsSearch.includes(searchValue);
             return matchesStatus && matchesSearch;
         });
     }, [flags, search, status]);
@@ -108,20 +117,38 @@ export default function FeatureGrid({ flags, isLoading, onToggle, onEdit }: Feat
                     {!isLoading && filteredFlags.map((flag) => {
                         const isEnabled = flag.enabledFor.length > 0;
                         return (
-                            <Card key={flag.name} variant="outlined" sx={{ bgcolor: 'background.paper' }}>
+                            <Card
+                                key={flag.name}
+                                variant="outlined"
+                                onClick={() => onEdit(flag)}
+                                sx={{ bgcolor: 'background.paper', cursor: 'pointer' }}
+                            >
                                 <CardContent>
                                     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                                         <Box sx={{ minWidth: 0 }}>
-                                            <Typography variant="h6" sx={{ fontWeight: 700 }} noWrap title={flag.name}>
+                                            <Typography
+                                                variant="h6"
+                                                sx={{ fontWeight: 700 }}
+                                                noWrap
+                                                title={flag.name}
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    onEdit(flag);
+                                                }}
+                                            >
                                                 {flag.name}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary">
                                                 {isEnabled ? 'Enabled' : 'Disabled'}
                                             </Typography>
+                                            <Typography variant="body2" color="text.secondary">
+                                                Owner: {flag.owner || 'Unassigned'}
+                                            </Typography>
                                         </Box>
                                         <Switch
                                             color="success"
                                             checked={isEnabled}
+                                            onClick={(event) => event.stopPropagation()}
                                             onChange={() => onToggle(flag)}
                                         />
                                     </Stack>
@@ -140,11 +167,57 @@ export default function FeatureGrid({ flags, isLoading, onToggle, onEdit }: Feat
                                             variant="outlined"
                                             color={flag.enabledFor.length > 0 ? 'primary' : 'default'}
                                         />
+                                        {flag.tags.map((tag) => (
+                                            <Chip
+                                                key={`${flag.name}-${tag}`}
+                                                size="small"
+                                                label={`Tag: ${tag}`}
+                                                variant="outlined"
+                                            />
+                                        ))}
                                     </Stack>
 
                                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                                        <Button variant="outlined" size="small" onClick={() => onEdit(flag)}>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onEdit(flag);
+                                            }}
+                                        >
                                             Configure
+                                        </Button>
+                                        <Button
+                                            variant="text"
+                                            size="small"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onHistory(flag);
+                                            }}
+                                        >
+                                            History
+                                        </Button>
+                                        <Button
+                                            variant="text"
+                                            size="small"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onActivity(flag);
+                                            }}
+                                        >
+                                            Activity
+                                        </Button>
+                                        <Button
+                                            variant="text"
+                                            color="error"
+                                            size="small"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onDelete(flag);
+                                            }}
+                                        >
+                                            Delete
                                         </Button>
                                     </Stack>
                                 </CardContent>

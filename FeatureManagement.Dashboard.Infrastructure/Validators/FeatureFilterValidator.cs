@@ -24,5 +24,10 @@ internal sealed class FeatureFilterValidator : AbstractValidator<FeatureFilter>
       .Must(FeatureFilterValidatorHelper.HasValidTimeWindow)
       .When(filter => filter.Name == Constants.TimeWindowFilterName)
       .WithMessage(Constants.ErrorMessages.InvalidTimeWindow);
+
+    RuleFor(filter => filter)
+      .Must(FeatureFilterValidatorHelper.HasValidTargeting)
+      .When(filter => filter.Name == Constants.TargetingFilterName)
+      .WithMessage(Constants.ErrorMessages.InvalidTargeting);
   }
 }

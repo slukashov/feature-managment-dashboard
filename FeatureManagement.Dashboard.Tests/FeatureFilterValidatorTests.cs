@@ -13,6 +13,15 @@ public sealed class FeatureFilterValidatorTests
   [InlineData("Microsoft.Percentage", "{\"Value\":100}")]
   [InlineData("Microsoft.Percentage", "{\"Value\":\"42\"}")]
   [InlineData("Microsoft.TimeWindow", "{\"Start\":\"2026-05-23T10:00:00Z\",\"End\":\"2026-05-23T12:00:00Z\"}")]
+  [InlineData("Microsoft.Targeting", "{\"Audience\":{\"Users\":[\"alice\"]}}")]
+  [InlineData("Microsoft.Targeting", "{\"Audience\":{\"Groups\":[{\"Name\":\"beta\",\"RolloutPercentage\":50}]}}")]
+  [InlineData("Microsoft.Targeting", "{\"Audience\":{\"DefaultRolloutPercentage\":25}}")]
+  [InlineData("Microsoft.Targeting", "{\"Audience\":{\"DefaultRolloutPercentage\":\"25\"}}")]
+  [InlineData("Microsoft.Targeting", "{\"Audience\":{\"Roles\":[\"admin\"]}}")]
+  [InlineData("Microsoft.Targeting", "{\"Audience\":{\"IpRanges\":[\"10.0.0.0/24\"]}}")]
+  [InlineData("Microsoft.Targeting", "{\"Audience\":{\"CustomAttributes\":{\"country\":\"US\"}}}")]
+  [InlineData("Microsoft.Targeting", "{\"Audience\":{\"CustomAttributes\":{\"tenant\":[\"A\",\"B\"]}}}")]
+  [InlineData("Microsoft.Targeting", "{\"Audience\":{\"users\":[\"alice\"]}}")]
   public void FeatureFilterValidator_accepts_supported_valid_inputs(string filterName, string parametersJson)
   {
     var result = ValidateFilter(filterName, parametersJson);
@@ -79,6 +88,39 @@ public sealed class FeatureFilterValidatorTests
     Assert.False(result.IsValid);
     Assert.Contains(result.Errors,
       error => error.ErrorMessage == "Microsoft.TimeWindow filter requires valid Start and End where Start is before End.");
+  }
+
+  [Theory]
+  [InlineData("{}")]
+  [InlineData("{\"Audience\":{}}")]
+  [InlineData("{\"Audience\":{\"Users\":[]}}")]
+  [InlineData("{\"Audience\":{\"Users\":[\"\"]}}")]
+  [InlineData("{\"Audience\":{\"Users\":\"alice\"}}")]
+  [InlineData("{\"Audience\":{\"Groups\":[{\"Name\":\"beta\",\"RolloutPercentage\":101}]}}")]
+  [InlineData("{\"Audience\":{\"Groups\":[\"beta\"]}}")]
+  [InlineData("{\"Audience\":{\"Groups\":[{\"Name\":\"\",\"RolloutPercentage\":50}]}}")]
+  [InlineData("{\"Audience\":{\"Groups\":[{\"Name\":\"beta\",\"RolloutPercentage\":true}]}}")]
+  [InlineData("{\"Audience\":{\"Groups\":[{\"RolloutPercentage\":50}]}}")]
+  [InlineData("{\"Audience\":{\"DefaultRolloutPercentage\":-1}}")]
+  [InlineData("{\"Audience\":{\"DefaultRolloutPercentage\":\"NaN\"}}")]
+  [InlineData("{\"Audience\":{\"Roles\":[]}}")]
+  [InlineData("{\"Audience\":{\"Roles\":[\"\"]}}")]
+  [InlineData("{\"Audience\":{\"IpRanges\":[]}}")]
+  [InlineData("{\"Audience\":{\"IpRanges\":[\"\"]}}")]
+  [InlineData("{\"Audience\":{\"CustomAttributes\":{}}}")]
+  [InlineData("{\"Audience\":{\"CustomAttributes\":{\"tier\":1}}}")]
+  [InlineData("{\"Audience\":{\"CustomAttributes\":{\" \":\"value\"}}}")]
+  [InlineData("{\"Audience\":[]}")]
+  [InlineData("null")]
+  [InlineData("{not json}")]
+  public void FeatureFilterValidator_rejects_invalid_targeting_payloads(string parametersJson)
+  {
+    var result = ValidateFilter("Microsoft.Targeting", parametersJson);
+
+    Assert.False(result.IsValid);
+    Assert.Contains(result.Errors,
+      error => error.ErrorMessage ==
+               "Microsoft.Targeting filter requires a valid Audience with Users, Groups, or DefaultRolloutPercentage between 0 and 100.");
   }
 
   private static ValidationResult ValidateFilter(string filterName, string? parametersJson)

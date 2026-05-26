@@ -1,15 +1,25 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import FeatureDialog from './FeatureDialog';
 import { FeatureFlag } from '../types/featureFlags';
 
-const emptyFlag: FeatureFlag = { name: '', requirementType: 0, enabledFor: [] };
+function renderWithLocalization(ui: React.ReactNode) {
+  return render(
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      {ui}
+    </LocalizationProvider>
+  );
+}
+
+const emptyFlag: FeatureFlag = { name: '', owner: '', tags: [], requirementType: 0, enabledFor: [] };
 
 describe('FeatureDialog', () => {
-  it('disables save when name is empty and enables it after input', async () => {
-    const onSave = vi.fn();
-
-    render(
+   it('disables save when name is empty and enables it after input', async () => {
+     const onSave = vi.fn();
+ 
+     renderWithLocalization(
       <FeatureDialog
         open
         onClose={vi.fn()}
@@ -33,14 +43,14 @@ describe('FeatureDialog', () => {
 
     await waitFor(() => {
       expect(onSave).toHaveBeenCalledWith(
-        { name: 'gamma-feature', requirementType: 0, enabledFor: [] },
+        { name: 'gamma-feature', owner: '', tags: [], requirementType: 0, enabledFor: [] },
         true
       );
     });
   });
 
-  it('toggles advanced rules block with the master switch', async () => {
-    render(
+   it('toggles advanced rules block with the master switch', async () => {
+     renderWithLocalization(
       <FeatureDialog
         open
         onClose={vi.fn()}
@@ -59,14 +69,16 @@ describe('FeatureDialog', () => {
     expect(screen.getByRole('button', { name: 'Add Rule' })).toBeInTheDocument();
   });
 
-  it('uses edit mode title and keeps feature name disabled', () => {
-    const initialData: FeatureFlag = {
-      name: 'existing-flag',
-      requirementType: 1,
-      enabledFor: [{ name: 'AlwaysOn', parametersJson: '{}' }]
-    };
+   it('uses edit mode title and keeps feature name disabled', () => {
+     const initialData: FeatureFlag = {
+       name: 'existing-flag',
+       owner: 'team-existing',
+       tags: ['existing'],
+       requirementType: 1,
+       enabledFor: [{ name: 'AlwaysOn', parametersJson: '{}' }]
+     };
 
-    render(
+     renderWithLocalization(
       <FeatureDialog
         open
         onClose={vi.fn()}
@@ -84,12 +96,14 @@ describe('FeatureDialog', () => {
     const onSave = vi.fn();
     const initialData: FeatureFlag = {
       name: 'targeted-flag',
+      owner: 'team-targeting',
+      tags: ['targeting'],
       requirementType: 0,
-      enabledFor: [{ name: 'Microsoft.Percentage', parametersJson: '{"Value":50}' }]
-    };
+       enabledFor: [{ name: 'Microsoft.Percentage', parametersJson: '{"Value":50}' }]
+     };
 
-    render(
-      <FeatureDialog
+     renderWithLocalization(
+       <FeatureDialog
         open
         onClose={vi.fn()}
         onSave={onSave}
@@ -114,6 +128,8 @@ describe('FeatureDialog', () => {
       expect(onSave).toHaveBeenCalledWith(
         {
           name: 'targeted-flag',
+          owner: 'team-targeting',
+          tags: ['targeting'],
           requirementType: 0,
           enabledFor: [{ name: 'Microsoft.Percentage', parametersJson: '{"Value":80}' }]
         },
@@ -126,75 +142,83 @@ describe('FeatureDialog', () => {
     const onSave = vi.fn();
     const initialData: FeatureFlag = {
       name: 'switch-off-flag',
-      requirementType: 1,
-      enabledFor: [{ name: 'AlwaysOn', parametersJson: '{}' }]
-    };
+      owner: 'team-switch',
+      tags: ['switch'],
+       requirementType: 1,
+       enabledFor: [{ name: 'AlwaysOn', parametersJson: '{}' }]
+     };
 
-    render(
-      <FeatureDialog
-        open
-        onClose={vi.fn()}
-        onSave={onSave}
-        initialData={initialData}
-        isNew={false}
-      />
-    );
+     renderWithLocalization(
+       <FeatureDialog
+         open
+         onClose={vi.fn()}
+         onSave={onSave}
+         initialData={initialData}
+         isNew={false}
+       />
+     );
 
-    const dialog = screen.getByRole('dialog', { name: 'Edit Feature Configuration' });
-    fireEvent.click(within(dialog).getByRole('switch'));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save Changes' }));
+     const dialog = screen.getByRole('dialog', { name: 'Edit Feature Configuration' });
+     fireEvent.click(within(dialog).getByRole('switch'));
+     fireEvent.click(within(dialog).getByRole('button', { name: 'Save Changes' }));
 
-    await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith(
-        {
-          name: 'switch-off-flag',
-          requirementType: 1,
-          enabledFor: []
-        },
-        false
-      );
-    });
-  });
+     await waitFor(() => {
+       expect(onSave).toHaveBeenCalledWith(
+         {
+           name: 'switch-off-flag',
+           owner: 'team-switch',
+           tags: ['switch'],
+           requirementType: 1,
+           enabledFor: []
+         },
+         false
+       );
+     });
+   });
 
-  it('changes rule requirement to ALL and saves updated requirement type', async () => {
-    const onSave = vi.fn();
-    const initialData: FeatureFlag = {
-      name: 'requirement-flag',
-      requirementType: 0,
-      enabledFor: [{ name: 'AlwaysOn', parametersJson: '{}' }]
-    };
+   it('changes rule requirement to ALL and saves updated requirement type', async () => {
+     const onSave = vi.fn();
+     const initialData: FeatureFlag = {
+       name: 'requirement-flag',
+       owner: 'team-requirement',
+       tags: ['requirement'],
+       requirementType: 0,
+       enabledFor: [{ name: 'AlwaysOn', parametersJson: '{}' }]
+     };
 
-    render(
-      <FeatureDialog
-        open
-        onClose={vi.fn()}
-        onSave={onSave}
-        initialData={initialData}
-        isNew={false}
-      />
-    );
+     renderWithLocalization(
+       <FeatureDialog
+         open
+         onClose={vi.fn()}
+         onSave={onSave}
+         initialData={initialData}
+         isNew={false}
+       />
+     );
 
-    const dialog = screen.getByRole('dialog', { name: 'Edit Feature Configuration' });
-    fireEvent.mouseDown(within(dialog).getByRole('combobox', { name: 'Rule Requirement' }));
-    fireEvent.click(screen.getByRole('option', { name: 'Match ALL rules (AND)' }));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Save Changes' }));
+     const dialog = screen.getByRole('dialog', { name: 'Edit Feature Configuration' });
+     fireEvent.mouseDown(within(dialog).getByRole('combobox', { name: 'Rule Requirement' }));
+     fireEvent.click(screen.getByRole('option', { name: 'Match ALL rules (AND)' }));
+     fireEvent.click(within(dialog).getByRole('button', { name: 'Save Changes' }));
 
-    await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith(
-        {
-          name: 'requirement-flag',
-          requirementType: 1,
-          enabledFor: [{ name: 'AlwaysOn', parametersJson: '{}' }]
-        },
-        false
-      );
-    });
-  });
+     await waitFor(() => {
+       expect(onSave).toHaveBeenCalledWith(
+         {
+           name: 'requirement-flag',
+           owner: 'team-requirement',
+           tags: ['requirement'],
+           requirementType: 1,
+           enabledFor: [{ name: 'AlwaysOn', parametersJson: '{}' }]
+         },
+         false
+       );
+     });
+   });
 
-  it('calls onClose when cancel is clicked', () => {
-    const onClose = vi.fn();
+   it('calls onClose when cancel is clicked', () => {
+     const onClose = vi.fn();
 
-    render(
+     renderWithLocalization(
       <FeatureDialog
         open
         onClose={onClose}

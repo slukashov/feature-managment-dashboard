@@ -1,4 +1,5 @@
 using FeatureManagement.Dashboard.Models;
+using FeatureManagement.Dashboard.Infrastructure.Persistence;
 using FluentValidation;
 
 namespace FeatureManagement.Dashboard.Tests;
@@ -84,6 +85,23 @@ public sealed class FeatureManagementServiceRegistrationTests
     var schemaOptions = provider.GetRequiredService<FeatureManagementSchemaOptions>();
 
     Assert.Equal(FeatureManagementSqlScriptProvider.Sqlite, schemaOptions.SqlScriptProvider);
+  }
+
+  [Fact]
+  public void Feature_flag_version_is_configured_as_concurrency_token()
+  {
+    var services = new ServiceCollection();
+    services.AddFeatureManagementUi(options => options.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+
+    using var provider = services.BuildServiceProvider();
+    using var scope = provider.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<IFeatureManagementContext>();
+    var dbContext = (DbContext)db;
+
+    var versionProperty = dbContext.Model.FindEntityType(typeof(FeatureFlag))?.FindProperty(nameof(FeatureFlag.Version));
+
+    Assert.NotNull(versionProperty);
+    Assert.True(versionProperty!.IsConcurrencyToken);
   }
 
   private sealed class FakeTimeProvider(DateTimeOffset utcNow) : TimeProvider

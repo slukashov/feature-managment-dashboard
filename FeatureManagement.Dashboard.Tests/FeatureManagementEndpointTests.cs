@@ -249,6 +249,293 @@ public sealed class FeatureManagementEndpointTests
   }
 
   [Fact]
+  public async Task Api_supports_search_owner_and_tag_filters()
+  {
+    await using var app = await FeatureManagementTestHost.CreateAsync(new AllowAllAccessRequirement());
+
+    var first = await PostFlagAsync(app.Client, new FeatureFlag
+    {
+      Name = "checkout-flow",
+      Owner = "team-payments",
+      Tags = ["checkout", "payments"],
+      RequirementType = RequirementType.Any,
+      EnabledFor =
+      [
+        new FeatureFilter
+        {
+          Name = "Microsoft.Percentage",
+          ParametersJson = "{\"Value\":20}"
+        }
+      ]
+    });
+    Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+
+    var second = await PostFlagAsync(app.Client, new FeatureFlag
+    {
+      Name = "profile-redesign",
+      Owner = "team-profile",
+      Tags = ["profile"],
+      RequirementType = RequirementType.Any,
+      EnabledFor =
+      [
+        new FeatureFilter
+        {
+          Name = "Microsoft.Percentage",
+          ParametersJson = "{\"Value\":40}"
+        }
+      ]
+    });
+    Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+    var searchResponse = await app.Client.GetAsync("/api/feature-flags?search=checkout");
+    var searchBody = await searchResponse.Content.ReadAsStringAsync();
+    using var searchJson = JsonDocument.Parse(searchBody);
+    Assert.Single(searchJson.RootElement.EnumerateArray());
+    Assert.Equal("checkout-flow", searchJson.RootElement[0].GetProperty("name").GetString());
+
+    var ownerResponse = await app.Client.GetAsync("/api/feature-flags?owner=team-profile");
+    var ownerBody = await ownerResponse.Content.ReadAsStringAsync();
+    using var ownerJson = JsonDocument.Parse(ownerBody);
+    Assert.Single(ownerJson.RootElement.EnumerateArray());
+    Assert.Equal("profile-redesign", ownerJson.RootElement[0].GetProperty("name").GetString());
+
+    var tagResponse = await app.Client.GetAsync("/api/feature-flags?tag=payments");
+    var tagBody = await tagResponse.Content.ReadAsStringAsync();
+    using var tagJson = JsonDocument.Parse(tagBody);
+    Assert.Single(tagJson.RootElement.EnumerateArray());
+    Assert.Equal("checkout-flow", tagJson.RootElement[0].GetProperty("name").GetString());
+  }
+
+  [Fact]
+  public async Task Api_get_by_name_returns_etag_header_with_current_version()
+  {
+    await using var app = await FeatureManagementTestHost.CreateAsync(new AllowAllAccessRequirement());
+
+    var createResponse = await PostFlagAsync(app.Client, new FeatureFlag
+    {
+      Name = "etag-flag",
+      RequirementType = RequirementType.Any,
+      EnabledFor =
+      [
+        new FeatureFilter
+        {
+          Name = "Microsoft.Percentage",
+          ParametersJson = "{\"Value\":25}"
+        }
+      ]
+    });
+    Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+    Assert.Equal("\"v1\"", createResponse.Headers.ETag?.Tag);
+
+    var getResponse = await app.Client.GetAsync("/api/feature-flags/etag-flag");
+
+    Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+    Assert.Equal("\"v1\"", getResponse.Headers.ETag?.Tag);
+  }
+
+  [Fact]
+  public async Task Api_update_supports_if_match_header_for_optimistic_concurrency()
+  {
+    await using var app = await FeatureManagementTestHost.CreateAsync(new AllowAllAccessRequirement());
+
+    var createResponse = await PostFlagAsync(app.Client, new FeatureFlag
+    {
+      Name = "if-match-flag",
+      RequirementType = RequirementType.Any,
+      EnabledFor =
+      [
+        new FeatureFilter
+        {
+          Name = "Microsoft.Percentage",
+          ParametersJson = "{\"Value\":10}"
+        }
+      ]
+    });
+    Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+    var updateRequest = new HttpRequestMessage(HttpMethod.Put, "/api/feature-flags/if-match-flag")
+    {
+      Content = JsonContent.Create(new FeatureFlag
+      {
+        Name = "if-match-flag",
+        RequirementType = RequirementType.Any,
+        Version = 999,
+        EnabledFor =
+        [
+          new FeatureFilter
+          {
+            Name = "Microsoft.Percentage",
+            ParametersJson = "{\"Value\":30}"
+          }
+        ]
+      })
+    };
+    updateRequest.Headers.TryAddWithoutValidation("If-Match", "\"v1\"");
+
+    var updateResponse = await app.Client.SendAsync(updateRequest);
+    Assert.Equal(HttpStatusCode.NoContent, updateResponse.StatusCode);
+
+    var staleUpdateRequest = new HttpRequestMessage(HttpMethod.Put, "/api/feature-flags/if-match-flag")
+    {
+      Content = JsonContent.Create(new FeatureFlag
+      {
+        Name = "if-match-flag",
+        RequirementType = RequirementType.Any,
+        EnabledFor =
+        [
+          new FeatureFilter
+          {
+            Name = "Microsoft.Percentage",
+            ParametersJson = "{\"Value\":35}"
+          }
+        ]
+      })
+    };
+    staleUpdateRequest.Headers.TryAddWithoutValidation("If-Match", "\"v1\"");
+
+    var staleResponse = await app.Client.SendAsync(staleUpdateRequest);
+    Assert.Equal(HttpStatusCode.Conflict, staleResponse.StatusCode);
+
+    var invalidIfMatchRequest = new HttpRequestMessage(HttpMethod.Put, "/api/feature-flags/if-match-flag")
+    {
+      Content = JsonContent.Create(new FeatureFlag
+      {
+        Name = "if-match-flag",
+        RequirementType = RequirementType.Any,
+        EnabledFor =
+        [
+          new FeatureFilter
+          {
+            Name = "Microsoft.Percentage",
+            ParametersJson = "{\"Value\":45}"
+          }
+        ]
+      })
+    };
+    invalidIfMatchRequest.Headers.TryAddWithoutValidation("If-Match", "invalid");
+
+    var invalidIfMatchResponse = await app.Client.SendAsync(invalidIfMatchRequest);
+    Assert.Equal(HttpStatusCode.BadRequest, invalidIfMatchResponse.StatusCode);
+  }
+
+  [Fact]
+  public async Task Api_accepts_segment_targeting_filter_and_maps_audience_parameters()
+  {
+    await using var app = await FeatureManagementTestHost.CreateAsync(new AllowAllAccessRequirement());
+    var provider = app.Services.GetRequiredService<IFeatureDefinitionProvider>();
+
+    var response = await PostFlagAsync(app.Client, new FeatureFlag
+    {
+      Name = "targeted-dashboard",
+      RequirementType = RequirementType.Any,
+      EnabledFor =
+      [
+        new FeatureFilter
+        {
+          Name = "Microsoft.Targeting",
+          ParametersJson =
+            "{\"Audience\":{\"Users\":[\"alice\",\"bob\"],\"Groups\":[{\"Name\":\"beta\",\"RolloutPercentage\":40}],\"DefaultRolloutPercentage\":10}}"
+        }
+      ]
+    });
+
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+    var definition = await provider.GetFeatureDefinitionAsync("targeted-dashboard");
+    Assert.NotNull(definition);
+
+    var filter = Assert.Single(definition.EnabledFor);
+    Assert.Equal("Microsoft.Targeting", filter.Name);
+    Assert.Equal("alice", filter.Parameters["Audience:Users:0"]);
+    Assert.Equal("bob", filter.Parameters["Audience:Users:1"]);
+    Assert.Equal("beta", filter.Parameters["Audience:Groups:0:Name"]);
+    Assert.Equal("40", filter.Parameters["Audience:Groups:0:RolloutPercentage"]);
+    Assert.Equal("10", filter.Parameters["Audience:DefaultRolloutPercentage"]);
+  }
+
+  [Fact]
+  public async Task Api_exposes_audit_history_and_allows_rollback_to_previous_version()
+  {
+    await using var app = await FeatureManagementTestHost.CreateAsync(new AllowAllAccessRequirement());
+
+    var createResponse = await PostFlagAsync(app.Client, new FeatureFlag
+    {
+      Name = "beta-dashboard",
+      RequirementType = RequirementType.Any,
+      EnabledFor =
+      [
+        new FeatureFilter
+        {
+          Name = "Microsoft.Percentage",
+          ParametersJson = "{\"Value\":10}"
+        }
+      ]
+    });
+    Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+    var updateResponse = await app.Client.PutAsJsonAsync("/api/feature-flags/beta-dashboard", new FeatureFlag
+    {
+      Name = "beta-dashboard",
+      RequirementType = RequirementType.Any,
+      Version = 1,
+      EnabledFor =
+      [
+        new FeatureFilter
+        {
+          Name = "Microsoft.Percentage",
+          ParametersJson = "{\"Value\":80}"
+        }
+      ]
+    });
+    Assert.Equal(HttpStatusCode.NoContent, updateResponse.StatusCode);
+
+    var auditResponse = await app.Client.GetAsync("/api/feature-flags/beta-dashboard/audit");
+    Assert.Equal(HttpStatusCode.OK, auditResponse.StatusCode);
+    var auditBody = await auditResponse.Content.ReadAsStringAsync();
+    using var auditJson = JsonDocument.Parse(auditBody);
+    Assert.Equal(2, auditJson.RootElement.GetArrayLength());
+    Assert.Equal((int)FeatureFlagAuditAction.Updated, auditJson.RootElement[0].GetProperty("action").GetInt32());
+    Assert.Equal((int)FeatureFlagAuditAction.Created, auditJson.RootElement[1].GetProperty("action").GetInt32());
+
+    var rollbackResponse = await app.Client.PostAsync("/api/feature-flags/beta-dashboard/rollback/1", null);
+    Assert.Equal(HttpStatusCode.OK, rollbackResponse.StatusCode);
+
+    var flagsResponse = await app.Client.GetAsync("/api/feature-flags");
+    var flagsBody = await flagsResponse.Content.ReadAsStringAsync();
+    using var flagsJson = JsonDocument.Parse(flagsBody);
+    var flagJson = Assert.Single(flagsJson.RootElement.EnumerateArray());
+    Assert.Equal(3, flagJson.GetProperty("version").GetInt32());
+    Assert.Equal("{\"Value\":10}", flagJson.GetProperty("enabledFor")[0].GetProperty("parametersJson").GetString());
+  }
+
+  [Fact]
+  public async Task Api_returns_not_found_when_rollback_version_does_not_exist()
+  {
+    await using var app = await FeatureManagementTestHost.CreateAsync(new AllowAllAccessRequirement());
+
+    var createResponse = await PostFlagAsync(app.Client, new FeatureFlag
+    {
+      Name = "beta-dashboard",
+      RequirementType = RequirementType.Any,
+      EnabledFor =
+      [
+        new FeatureFilter
+        {
+          Name = "Microsoft.Percentage",
+          ParametersJson = "{\"Value\":10}"
+        }
+      ]
+    });
+    Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+    var rollbackResponse = await app.Client.PostAsync("/api/feature-flags/beta-dashboard/rollback/999", null);
+
+    Assert.Equal(HttpStatusCode.NotFound, rollbackResponse.StatusCode);
+    var body = await rollbackResponse.Content.ReadAsStringAsync();
+    Assert.Contains("Rollback target version", body);
+  }
+
+  [Fact]
   public async Task Api_update_without_version_allows_last_write_wins()
   {
     await using var app = await FeatureManagementTestHost.CreateAsync(new AllowAllAccessRequirement());

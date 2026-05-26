@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
     Container,
     Typography,
@@ -9,21 +9,20 @@ import {
     Card,
     CardContent,
     Stack,
-    IconButton,
     CssBaseline
 } from '@mui/material';
 import { ThemeProvider, createTheme, alpha } from '@mui/material/styles';
 import AddIcon from '@mui/icons-material/Add';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import FeatureGrid from './components/FeatureGrid';
 import FeatureDialog from './components/FeatureDialog';
+import HistoryDialog from './components/HistoryDialog';
+import ActivityFeedDialog from './components/ActivityFeedDialog';
 import { useFeatureFlags } from './hooks/useFeatureFlags';
-import { FeatureFlag, NotificationSeverity } from './types/featureFlags';
+import { FeatureFlag, FeatureFlagAuditLog, FeatureFlagActivityEntry, NotificationSeverity } from './types/featureFlags';
 
-const DEFAULT_FLAG: FeatureFlag = { name: '', requirementType: 0, enabledFor: [] };
+const DEFAULT_FLAG: FeatureFlag = { name: '', owner: '', tags: [], requirementType: 0, enabledFor: [] };
 
 interface ToastState {
     open: boolean;
@@ -32,7 +31,33 @@ interface ToastState {
 }
 
 export default function App() {
-    const [mode, setMode] = useState<'light' | 'dark'>('light');
+    const getSystemMode = (): 'light' | 'dark' => {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+            return 'light';
+        }
+
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    };
+
+    const [mode, setMode] = useState<'light' | 'dark'>(getSystemMode);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+            return;
+        }
+
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const updateThemeMode = (event: MediaQueryListEvent) => {
+            setMode(event.matches ? 'dark' : 'light');
+        };
+
+        setMode(mediaQuery.matches ? 'dark' : 'light');
+        mediaQuery.addEventListener('change', updateThemeMode);
+
+        return () => {
+            mediaQuery.removeEventListener('change', updateThemeMode);
+        };
+    }, []);
 
     const theme = useMemo(() => createTheme({
         palette: mode === 'dark'
@@ -82,6 +107,15 @@ export default function App() {
     const [dialogOpen, setDialogOpen] = useState<boolean>(false);
     const [editingFlag, setEditingFlag] = useState<FeatureFlag>(DEFAULT_FLAG);
     const [isNew, setIsNew] = useState<boolean>(true);
+     const [historyOpen, setHistoryOpen] = useState<boolean>(false);
+     const [historyFeatureName, setHistoryFeatureName] = useState<string>('');
+     const [historyEntries, setHistoryEntries] = useState<FeatureFlagAuditLog[]>([]);
+     const [isHistoryLoading, setIsHistoryLoading] = useState<boolean>(false);
+     const [isRollingBack, setIsRollingBack] = useState<boolean>(false);
+     const [activityOpen, setActivityOpen] = useState<boolean>(false);
+     const [activityFeatureName, setActivityFeatureName] = useState<string>('');
+     const [activityEntries, setActivityEntries] = useState<FeatureFlagActivityEntry[]>([]);
+     const [isActivityLoading, setIsActivityLoading] = useState<boolean>(false);
 
     // Notification State
     const [toast, setToast] = useState<ToastState>({ open: false, message: '', severity: 'success' });
@@ -90,8 +124,8 @@ export default function App() {
         setToast({ open: true, message, severity });
     }, []);
 
-    // Custom Hook
-    const { flags, isLoading, saveFlag, toggleFlag } = useFeatureFlags(showNotification);
+     // Custom Hook
+     const { flags, isLoading, saveFlag, toggleFlag, getAuditHistory, rollbackFlag, deleteFlag, getActivityFeed, scheduleChange } = useFeatureFlags(showNotification);
 
     // Handlers
     const handleAddClick = () => {
@@ -110,6 +144,57 @@ export default function App() {
         const success = await saveFlag(flagData, isNewData);
         if (success) setDialogOpen(false);
     };
+
+    const handleHistoryClick = async (flag: FeatureFlag) => {
+        setHistoryFeatureName(flag.name);
+        setHistoryEntries([]);
+        setHistoryOpen(true);
+        setIsHistoryLoading(true);
+
+        const entries = await getAuditHistory(flag.name);
+        if (entries) {
+            setHistoryEntries(entries);
+        }
+
+        setIsHistoryLoading(false);
+    };
+
+    const handleRollback = async (targetVersion: number) => {
+        if (!historyFeatureName) {
+            return;
+        }
+
+        setIsRollingBack(true);
+        const success = await rollbackFlag(historyFeatureName, targetVersion);
+        setIsRollingBack(false);
+
+        if (success) {
+            setHistoryOpen(false);
+        }
+    };
+
+     const handleDelete = async (flag: FeatureFlag) => {
+         const approved = window.confirm(`Delete feature flag "${flag.name}"? This action cannot be undone.`);
+         if (!approved) {
+             return;
+         }
+
+         await deleteFlag(flag.name);
+     };
+
+     const handleActivityClick = async (flag: FeatureFlag) => {
+         setActivityFeatureName(flag.name);
+         setActivityEntries([]);
+         setActivityOpen(true);
+         setIsActivityLoading(true);
+
+         const entries = await getActivityFeed(flag.name);
+         if (entries) {
+             setActivityEntries(entries);
+         }
+
+         setIsActivityLoading(false);
+     };
 
     return (
         <ThemeProvider theme={theme}>
@@ -135,18 +220,6 @@ export default function App() {
                                         </Typography>
                                     </Box>
                                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                                        <IconButton
-                                            aria-label="toggle-theme"
-                                            onClick={() => setMode((prev) => prev === 'light' ? 'dark' : 'light')}
-                                            color="primary"
-                                            sx={{
-                                                border: '1px solid',
-                                                borderColor: 'divider',
-                                                bgcolor: 'background.paper'
-                                            }}
-                                        >
-                                            {mode === 'light' ? <DarkModeIcon /> : <LightModeIcon />}
-                                        </IconButton>
                                         <Button variant="contained" startIcon={<AddIcon />} disableElevation onClick={handleAddClick}>
                                             New Feature Flag
                                         </Button>
@@ -155,12 +228,15 @@ export default function App() {
                             </CardContent>
                         </Card>
 
-                        <FeatureGrid
-                            flags={flags}
-                            isLoading={isLoading}
-                            onToggle={toggleFlag}
-                            onEdit={handleEditClick}
-                        />
+                         <FeatureGrid
+                             flags={flags}
+                             isLoading={isLoading}
+                             onToggle={toggleFlag}
+                             onEdit={handleEditClick}
+                             onHistory={handleHistoryClick}
+                             onActivity={handleActivityClick}
+                             onDelete={handleDelete}
+                         />
 
                         <FeatureDialog
                             open={dialogOpen}
@@ -169,6 +245,24 @@ export default function App() {
                             initialData={editingFlag}
                             isNew={isNew}
                         />
+
+                         <HistoryDialog
+                             open={historyOpen}
+                             featureName={historyFeatureName}
+                             auditEntries={historyEntries}
+                             isLoading={isHistoryLoading}
+                             isRollingBack={isRollingBack}
+                             onClose={() => setHistoryOpen(false)}
+                             onRollback={handleRollback}
+                         />
+
+                         <ActivityFeedDialog
+                             open={activityOpen}
+                             featureName={activityFeatureName}
+                             activityEntries={activityEntries}
+                             isLoading={isActivityLoading}
+                             onClose={() => setActivityOpen(false)}
+                         />
                     </Container>
 
                     <Snackbar

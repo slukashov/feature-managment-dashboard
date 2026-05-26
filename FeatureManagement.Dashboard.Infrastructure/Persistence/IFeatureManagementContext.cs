@@ -33,6 +33,16 @@ public interface IFeatureManagementContext
   DbSet<FeatureFilter> FeatureFilters { get; }
 
   /// <summary>
+  /// Represents a collection of audit entries for feature flag changes.
+  /// </summary>
+  DbSet<FeatureFlagAuditLog> FeatureFlagAuditLogs { get; }
+
+  /// <summary>
+  /// Represents a collection of activity feed entries for human-readable feature flag change history.
+  /// </summary>
+  DbSet<FeatureFlagActivityEntry> FeatureFlagActivityEntries { get; }
+
+  /// <summary>
   /// Provides access to database-specific functionality for the feature management context.
   /// </summary>
   /// <remarks>

@@ -16,5 +16,9 @@ public interface IGetAllFeatureFlagsUseCase
   /// <returns>
   /// A task representing the asynchronous operation, containing a list of <see cref="FeatureManagement.Dashboard.Models.FeatureFlag"/> objects.
   /// </returns>
-  Task<List<FeatureFlag>> ExecuteAsync(CancellationToken cancellationToken = default);
+  Task<List<FeatureFlag>> ExecuteAsync(
+    string? search = null,
+    string? owner = null,
+    string? tag = null,
+    CancellationToken cancellationToken = default);
 }

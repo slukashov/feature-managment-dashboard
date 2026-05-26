@@ -28,9 +28,16 @@ Authorization is host-owned via ASP.NET Core `IAuthorizationRequirement`.
 ## Key Features
 
 - CRUD operations for feature flags
-- Rule-based targeting (`AlwaysOn`, `Microsoft.Percentage`, `Microsoft.TimeWindow`, custom JSON)
+- Rule-based targeting (`AlwaysOn`, `Microsoft.Percentage`, `Microsoft.TimeWindow`, `Microsoft.Targeting`, custom JSON)
+- Advanced targeting inside `Microsoft.Targeting` (`Users`, `Groups`, `Roles`, `IpRanges`, `CustomAttributes`, `DefaultRolloutPercentage`)
+- Owner and tags metadata on each feature flag
+- Search and filtering by name, owner, and tag
 - Feature definition provider backed by database + memory cache
 - Version-aware updates for optimistic concurrency
+- Audit log for create/update/delete/rollback operations
+- Activity feed with human-readable change entries
+- Rollback to any previously audited version
+- Scheduled rollouts for future-dated feature changes
 - Embedded UI served from the host application
 
 ## Install
@@ -103,12 +110,17 @@ await app.RunAsync();
 - Schema initialization runs automatically at startup through an internal hosted service.
 - Relational providers use embedded SQL scripts only.
 - Non-relational providers use `EnsureCreated`.
+- For relational providers, startup applies the base `create_*` script and then runs pending `migrate_*` scripts automatically.
+- Applied migrations are tracked in `FeatureManagementSchemaMigrations` to ensure each script runs only once.
 
 Available script files:
 
 - `create_feature_management_tables.postgres.sql`
 - `create_feature_management_tables.mysql.sql`
 - `create_feature_management_tables.sqlite.sql`
+- `migrate_postgres_*.sql`
+- `migrate_mysql_*.sql`
+- `migrate_sqlite_*.sql`
 
 You can force a specific script:
 
@@ -123,9 +135,14 @@ builder.Services.AddFeatureManagementUi(
 
 Default route prefix: `/api/feature-flags`
 
-- `GET /api/feature-flags` - list feature flags
+- `GET /api/feature-flags` - list feature flags (supports `search`, `owner`, `tag` query params)
+- `GET /api/feature-flags/{name}` - get a single feature flag (returns `ETag: "v{version}"`)
+- `GET /api/feature-flags/{name}/audit` - read audit history for a flag
+- `GET /api/feature-flags/{name}/activity` - read activity feed for a flag
 - `POST /api/feature-flags` - create feature flag
-- `PUT /api/feature-flags/{name}` - update feature flag
+- `PUT /api/feature-flags/{name}` - update feature flag (supports `If-Match: "v{version}"`)
+- `POST /api/feature-flags/{name}/rollback/{targetVersion}` - rollback to an audited version
+- `POST /api/feature-flags/{name}/schedule` - schedule a future feature change (`{ flag, scheduledAtUtc }` payload)
 - `DELETE /api/feature-flags/{name}` - delete feature flag
 
 Default UI route: `/feature-flags`
