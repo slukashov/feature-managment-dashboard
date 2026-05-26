@@ -16,7 +16,7 @@ public class FeatureManagementRelationalInitializationTests
     await using (var command = host.Connection.CreateCommand())
     {
       command.CommandText =
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('FeatureFlags', 'FeatureFilters');";
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('FeatureFlags', 'FeatureFilters', 'FeatureFlagAuditLogs');";
 
       await using var reader = await command.ExecuteReaderAsync();
       while (await reader.ReadAsync())
@@ -27,6 +27,7 @@ public class FeatureManagementRelationalInitializationTests
 
     Assert.Contains("FeatureFlags", tableNames);
     Assert.Contains("FeatureFilters", tableNames);
+    Assert.Contains("FeatureFlagAuditLogs", tableNames);
   }
 
   [Fact]
@@ -78,15 +79,149 @@ public class FeatureManagementRelationalInitializationTests
 
     await using var tablesCommand = host.Connection.CreateCommand();
     tablesCommand.CommandText =
-      "SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name IN ('FeatureFlags', 'FeatureFilters');";
+      "SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name IN ('FeatureFlags', 'FeatureFilters', 'FeatureFlagAuditLogs');";
     var tableCount = (long)(await tablesCommand.ExecuteScalarAsync() ?? 0L);
-    Assert.Equal(2L, tableCount);
+    Assert.Equal(3L, tableCount);
 
     await using var historyCommand = host.Connection.CreateCommand();
     historyCommand.CommandText =
       "SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name = '__EFMigrationsHistory';";
     var historyTableExists = (long)(await historyCommand.ExecuteScalarAsync() ?? 0L);
     Assert.Equal(0L, historyTableExists);
+  }
+
+  [Fact]
+  public async Task Initialize_feature_management_store_applies_pending_migration_scripts_for_existing_schema()
+  {
+    await using var host = await SqliteRelationalTestHost.CreateAsync(
+      options => options.SqlScriptProvider = FeatureManagementSqlScriptProvider.Sqlite,
+      async connection =>
+      {
+        await using var seedCommand = connection.CreateCommand();
+        seedCommand.CommandText =
+          """
+          BEGIN TRANSACTION;
+
+          CREATE TABLE IF NOT EXISTS "FeatureFlags"
+          (
+            "Name" TEXT PRIMARY KEY,
+            "Owner" TEXT NOT NULL DEFAULT '',
+            "TagsJson" TEXT NOT NULL DEFAULT '[]',
+            "RequirementType" INTEGER NOT NULL,
+            "Version" INTEGER NOT NULL DEFAULT 1,
+            "UpdatedAtUtc" TEXT NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS "FeatureFilters"
+          (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "Name" TEXT NOT NULL,
+            "FeatureFlagName" TEXT NOT NULL,
+            "ParametersJson" TEXT NOT NULL DEFAULT '{}',
+            CONSTRAINT "FK_FeatureFilters_FeatureFlags_FeatureFlagName"
+              FOREIGN KEY ("FeatureFlagName") REFERENCES "FeatureFlags"("Name") ON DELETE CASCADE
+          );
+
+          CREATE TABLE IF NOT EXISTS "FeatureFlagAuditLogs"
+          (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "FeatureFlagName" TEXT NOT NULL,
+            "Action" INTEGER NOT NULL,
+            "SnapshotVersion" INTEGER NOT NULL,
+            "SnapshotJson" TEXT NOT NULL,
+            "ChangedAtUtc" TEXT NOT NULL,
+            "ChangedBy" TEXT NOT NULL
+          );
+
+          COMMIT;
+          """;
+        await seedCommand.ExecuteNonQueryAsync();
+      });
+
+    await using var columnCommand = host.Connection.CreateCommand();
+    columnCommand.CommandText =
+      "SELECT COUNT(1) FROM pragma_table_info('FeatureFlags') WHERE name = 'ScheduledAtUtc';";
+    var scheduledColumnExists = (long)(await columnCommand.ExecuteScalarAsync() ?? 0L);
+    Assert.Equal(1L, scheduledColumnExists);
+
+    await using var tableCommand = host.Connection.CreateCommand();
+    tableCommand.CommandText =
+      "SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name = 'FeatureFlagActivityEntries';";
+    var activityTableExists = (long)(await tableCommand.ExecuteScalarAsync() ?? 0L);
+    Assert.Equal(1L, activityTableExists);
+
+    await using var migrationHistoryCommand = host.Connection.CreateCommand();
+    migrationHistoryCommand.CommandText =
+      "SELECT COUNT(1) FROM \"FeatureManagementSchemaMigrations\" WHERE \"ScriptName\" = 'migrate_sqlite_add_scheduled_and_activity.sql';";
+    var migrationApplied = (long)(await migrationHistoryCommand.ExecuteScalarAsync() ?? 0L);
+    Assert.Equal(1L, migrationApplied);
+  }
+
+  [Fact]
+  public async Task Initialize_feature_management_store_marks_migration_as_applied_when_schema_already_contains_changes()
+  {
+    await using var host = await SqliteRelationalTestHost.CreateAsync(
+      options => options.SqlScriptProvider = FeatureManagementSqlScriptProvider.Sqlite,
+      async connection =>
+      {
+        await using var seedCommand = connection.CreateCommand();
+        seedCommand.CommandText =
+          """
+          BEGIN TRANSACTION;
+
+          CREATE TABLE IF NOT EXISTS "FeatureFlags"
+          (
+            "Name" TEXT PRIMARY KEY,
+            "Owner" TEXT NOT NULL DEFAULT '',
+            "TagsJson" TEXT NOT NULL DEFAULT '[]',
+            "RequirementType" INTEGER NOT NULL,
+            "Version" INTEGER NOT NULL DEFAULT 1,
+            "UpdatedAtUtc" TEXT NOT NULL,
+            "ScheduledAtUtc" TEXT
+          );
+
+          CREATE TABLE IF NOT EXISTS "FeatureFilters"
+          (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "Name" TEXT NOT NULL,
+            "FeatureFlagName" TEXT NOT NULL,
+            "ParametersJson" TEXT NOT NULL DEFAULT '{}',
+            CONSTRAINT "FK_FeatureFilters_FeatureFlags_FeatureFlagName"
+              FOREIGN KEY ("FeatureFlagName") REFERENCES "FeatureFlags"("Name") ON DELETE CASCADE
+          );
+
+          CREATE TABLE IF NOT EXISTS "FeatureFlagAuditLogs"
+          (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "FeatureFlagName" TEXT NOT NULL,
+            "Action" INTEGER NOT NULL,
+            "SnapshotVersion" INTEGER NOT NULL,
+            "SnapshotJson" TEXT NOT NULL,
+            "ChangedAtUtc" TEXT NOT NULL,
+            "ChangedBy" TEXT NOT NULL
+          );
+
+          CREATE TABLE IF NOT EXISTS "FeatureFlagActivityEntries"
+          (
+            "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
+            "FeatureFlagName" TEXT NOT NULL,
+            "ActivityType" TEXT NOT NULL,
+            "Description" TEXT NOT NULL,
+            "ChangeType" TEXT,
+            "ChangedAtUtc" TEXT NOT NULL,
+            "ChangedBy" TEXT NOT NULL
+          );
+
+          COMMIT;
+          """;
+        await seedCommand.ExecuteNonQueryAsync();
+      });
+
+    await using var migrationHistoryCommand = host.Connection.CreateCommand();
+    migrationHistoryCommand.CommandText =
+      "SELECT COUNT(1) FROM \"FeatureManagementSchemaMigrations\" WHERE \"ScriptName\" = 'migrate_sqlite_add_scheduled_and_activity.sql';";
+    var migrationApplied = (long)(await migrationHistoryCommand.ExecuteScalarAsync() ?? 0L);
+    Assert.Equal(1L, migrationApplied);
   }
 
   private sealed class SqliteRelationalTestHost : IAsyncDisposable
@@ -101,10 +236,16 @@ public class FeatureManagementRelationalInitializationTests
     public SqliteConnection Connection { get; }
 
     public static async Task<SqliteRelationalTestHost> CreateAsync(
-      Action<FeatureManagementSchemaOptions>? schemaOptionsAction = null)
+      Action<FeatureManagementSchemaOptions>? schemaOptionsAction = null,
+      Func<SqliteConnection, Task>? preInitializeAsync = null)
     {
       var connection = new SqliteConnection("Data Source=:memory:");
       await connection.OpenAsync();
+
+      if (preInitializeAsync is not null)
+      {
+        await preInitializeAsync(connection);
+      }
 
       var builder = WebApplication.CreateBuilder(new WebApplicationOptions
       {

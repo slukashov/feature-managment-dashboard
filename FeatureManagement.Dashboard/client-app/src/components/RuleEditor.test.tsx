@@ -58,6 +58,21 @@ describe('RuleEditor', () => {
     expect(screen.getAllByText('End Date').length).toBeGreaterThan(0);
   });
 
+  it('shows targeting controls for Microsoft.Targeting', () => {
+    renderWithDateContext(
+      <RuleEditor
+        index={0}
+        filter={{ name: 'Microsoft.Targeting', parametersJson: '{"Audience":{"Users":["alice"],"Groups":[],"DefaultRolloutPercentage":15}}' }}
+        onUpdate={vi.fn()}
+        onRemove={vi.fn()}
+      />
+    );
+
+    expect(screen.getByLabelText('Users (comma-separated)')).toHaveValue('alice');
+    expect(screen.getByLabelText('Default Rollout Percentage (0-100)')).toHaveValue(15);
+    expect(screen.getByLabelText('Groups (JSON array)')).toHaveValue('[]');
+  });
+
   it('passes through invalid custom JSON', () => {
     const onUpdate = vi.fn();
 
@@ -133,6 +148,9 @@ describe('RuleEditor', () => {
     fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Rule Type' }));
     fireEvent.click(screen.getByRole('option', { name: 'Time Window' }));
 
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Rule Type' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Segment Targeting' }));
+
     expect(onUpdate).toHaveBeenNthCalledWith(1, 0, {
       name: 'Microsoft.Percentage',
       parametersJson: '{"Value":50}'
@@ -140,6 +158,54 @@ describe('RuleEditor', () => {
     expect(onUpdate).toHaveBeenNthCalledWith(2, 0, {
       name: 'Microsoft.TimeWindow',
       parametersJson: '{"Start":"","End":""}'
+    });
+    expect(onUpdate).toHaveBeenNthCalledWith(3, 0, {
+      name: 'Microsoft.Targeting',
+      parametersJson: '{"Audience":{"Users":[],"Groups":[],"Roles":[],"IpRanges":[],"CustomAttributes":{},"DefaultRolloutPercentage":0}}'
+    });
+  });
+
+  it('updates targeting users', () => {
+    const onUpdate = vi.fn();
+
+    renderWithDateContext(
+      <RuleEditor
+        index={7}
+        filter={{ name: 'Microsoft.Targeting', parametersJson: '{"Audience":{"Users":[],"Groups":[],"DefaultRolloutPercentage":0}}' }}
+        onUpdate={onUpdate}
+        onRemove={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText('Users (comma-separated)'), {
+      target: { value: 'alice, bob' }
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(7, {
+      name: 'Microsoft.Targeting',
+      parametersJson: '{"Audience":{"Users":["alice","bob"],"Groups":[],"Roles":[],"IpRanges":[],"CustomAttributes":{},"DefaultRolloutPercentage":0}}'
+    });
+  });
+
+  it('updates targeting default rollout percentage', () => {
+    const onUpdate = vi.fn();
+
+    renderWithDateContext(
+      <RuleEditor
+        index={7}
+        filter={{ name: 'Microsoft.Targeting', parametersJson: '{"Audience":{"Users":[],"Groups":[],"DefaultRolloutPercentage":0}}' }}
+        onUpdate={onUpdate}
+        onRemove={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText('Default Rollout Percentage (0-100)'), {
+      target: { value: '20' }
+    });
+
+    expect(onUpdate).toHaveBeenCalledWith(7, {
+      name: 'Microsoft.Targeting',
+      parametersJson: '{"Audience":{"Users":[],"Groups":[],"Roles":[],"IpRanges":[],"CustomAttributes":{},"DefaultRolloutPercentage":20}}'
     });
   });
 

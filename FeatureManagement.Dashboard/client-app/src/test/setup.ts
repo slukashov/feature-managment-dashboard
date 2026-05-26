@@ -6,8 +6,8 @@ afterEach(() => {
   cleanup();
 });
 
-if (!window.matchMedia) {
-  Object.defineProperty(window, 'matchMedia', {
+if (!globalThis.matchMedia) {
+  Object.defineProperty(globalThis, 'matchMedia', {
     writable: true,
     value: (query: string) => ({
       matches: false,

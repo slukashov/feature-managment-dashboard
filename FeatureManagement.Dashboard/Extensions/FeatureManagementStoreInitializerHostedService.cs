@@ -2,6 +2,7 @@ using FeatureManagement.Dashboard.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Data.Common;
 
 namespace FeatureManagement.Dashboard.Extensions;
 
@@ -9,6 +10,8 @@ internal sealed class FeatureManagementStoreInitializerHostedService(
   IServiceProvider services,
   FeatureManagementSchemaOptions schemaOptions) : IHostedService
 {
+  private const string MigrationHistoryTableName = "FeatureManagementSchemaMigrations";
+
   private static readonly Dictionary<FeatureManagementSqlScriptProvider, string> ScriptFileNames = new()
   {
     [FeatureManagementSqlScriptProvider.Postgres] = "create_feature_management_tables.postgres.sql",
@@ -47,6 +50,207 @@ internal sealed class FeatureManagementStoreInitializerHostedService(
     await using var command = connection.CreateCommand();
     command.CommandText = sql;
     await command.ExecuteNonQueryAsync(cancellationToken);
+
+    await EnsureMigrationHistoryTableAsync(connection, provider, cancellationToken);
+    await ApplyPendingMigrationsAsync(connection, provider, cancellationToken);
+  }
+
+  private static async Task EnsureMigrationHistoryTableAsync(
+    DbConnection connection,
+    FeatureManagementSqlScriptProvider provider,
+    CancellationToken cancellationToken)
+  {
+    await using var command = connection.CreateCommand();
+    command.CommandText = provider switch
+    {
+      FeatureManagementSqlScriptProvider.Postgres =>
+        $"CREATE TABLE IF NOT EXISTS \"{MigrationHistoryTableName}\" (\"ScriptName\" text PRIMARY KEY, \"AppliedAtUtc\" timestamp with time zone NOT NULL)",
+      FeatureManagementSqlScriptProvider.MySql =>
+        $"CREATE TABLE IF NOT EXISTS `{MigrationHistoryTableName}` (`ScriptName` varchar(255) NOT NULL PRIMARY KEY, `AppliedAtUtc` datetime(6) NOT NULL) ENGINE=InnoDB",
+      _ =>
+        $"CREATE TABLE IF NOT EXISTS \"{MigrationHistoryTableName}\" (\"ScriptName\" TEXT PRIMARY KEY, \"AppliedAtUtc\" TEXT NOT NULL)"
+    };
+
+    await command.ExecuteNonQueryAsync(cancellationToken);
+  }
+
+  private static async Task ApplyPendingMigrationsAsync(
+    DbConnection connection,
+    FeatureManagementSqlScriptProvider provider,
+    CancellationToken cancellationToken)
+  {
+    var migrationScriptNames = GetMigrationScriptNames(provider);
+    foreach (var scriptName in migrationScriptNames)
+    {
+      if (await IsMigrationAppliedAsync(connection, provider, scriptName, cancellationToken))
+      {
+        continue;
+      }
+
+      if (scriptName == "migrate_sqlite_add_scheduled_and_activity.sql" ||
+          scriptName == "migrate_postgres_add_scheduled_and_activity.sql" ||
+          scriptName == "migrate_mysql_add_scheduled_and_activity.sql")
+      {
+        var hasScheduledColumn = await HasColumnAsync(connection, provider, "FeatureFlags", "ScheduledAtUtc", cancellationToken);
+        var hasActivityTable = await HasTableAsync(connection, provider, "FeatureFlagActivityEntries", cancellationToken);
+        if (hasScheduledColumn && hasActivityTable)
+        {
+          await MarkMigrationAppliedAsync(connection, provider, scriptName, cancellationToken);
+          continue;
+        }
+      }
+
+      var sql = ReadEmbeddedScript(scriptName);
+      await using (var command = connection.CreateCommand())
+      {
+        command.CommandText = sql;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+      }
+
+      await MarkMigrationAppliedAsync(connection, provider, scriptName, cancellationToken);
+    }
+  }
+
+  private static IReadOnlyList<string> GetMigrationScriptNames(FeatureManagementSqlScriptProvider provider)
+  {
+    var prefix = provider switch
+    {
+      FeatureManagementSqlScriptProvider.Postgres => "migrate_postgres_",
+      FeatureManagementSqlScriptProvider.MySql => "migrate_mysql_",
+      _ => "migrate_sqlite_"
+    };
+
+    var assembly = typeof(FeatureManagementStoreInitializerHostedService).Assembly;
+    return assembly
+      .GetManifestResourceNames()
+      .Where(name => name.Contains(prefix, StringComparison.OrdinalIgnoreCase) && name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase))
+      .Select(name =>
+      {
+        var token = "Database.Scripts.";
+        var index = name.LastIndexOf(token, StringComparison.OrdinalIgnoreCase);
+        return index >= 0 ? name[(index + token.Length)..] : name;
+      })
+      .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
+      .ToList();
+  }
+
+  private static async Task<bool> IsMigrationAppliedAsync(
+    DbConnection connection,
+    FeatureManagementSqlScriptProvider provider,
+    string scriptName,
+    CancellationToken cancellationToken)
+  {
+    await using var command = connection.CreateCommand();
+    command.CommandText = provider switch
+    {
+      FeatureManagementSqlScriptProvider.Postgres =>
+        $"SELECT COUNT(1) FROM \"{MigrationHistoryTableName}\" WHERE \"ScriptName\" = @script",
+      FeatureManagementSqlScriptProvider.MySql =>
+        $"SELECT COUNT(1) FROM `{MigrationHistoryTableName}` WHERE `ScriptName` = @script",
+      _ =>
+        $"SELECT COUNT(1) FROM \"{MigrationHistoryTableName}\" WHERE \"ScriptName\" = @script"
+    };
+
+    var parameter = command.CreateParameter();
+    parameter.ParameterName = "@script";
+    parameter.Value = scriptName;
+    command.Parameters.Add(parameter);
+
+    var count = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+    return count > 0;
+  }
+
+  private static async Task MarkMigrationAppliedAsync(
+    DbConnection connection,
+    FeatureManagementSqlScriptProvider provider,
+    string scriptName,
+    CancellationToken cancellationToken)
+  {
+    await using var command = connection.CreateCommand();
+    command.CommandText = provider switch
+    {
+      FeatureManagementSqlScriptProvider.Postgres =>
+        $"INSERT INTO \"{MigrationHistoryTableName}\" (\"ScriptName\", \"AppliedAtUtc\") VALUES (@script, @appliedAt)",
+      FeatureManagementSqlScriptProvider.MySql =>
+        $"INSERT INTO `{MigrationHistoryTableName}` (`ScriptName`, `AppliedAtUtc`) VALUES (@script, @appliedAt)",
+      _ =>
+        $"INSERT INTO \"{MigrationHistoryTableName}\" (\"ScriptName\", \"AppliedAtUtc\") VALUES (@script, @appliedAt)"
+    };
+
+    var scriptParameter = command.CreateParameter();
+    scriptParameter.ParameterName = "@script";
+    scriptParameter.Value = scriptName;
+    command.Parameters.Add(scriptParameter);
+
+    var appliedAtParameter = command.CreateParameter();
+    appliedAtParameter.ParameterName = "@appliedAt";
+    appliedAtParameter.Value = provider == FeatureManagementSqlScriptProvider.Sqlite
+      ? DateTime.UtcNow.ToString("O")
+      : DateTime.UtcNow;
+    command.Parameters.Add(appliedAtParameter);
+
+    await command.ExecuteNonQueryAsync(cancellationToken);
+  }
+
+  private static async Task<bool> HasTableAsync(
+    DbConnection connection,
+    FeatureManagementSqlScriptProvider provider,
+    string tableName,
+    CancellationToken cancellationToken)
+  {
+    await using var command = connection.CreateCommand();
+    command.CommandText = provider switch
+    {
+      FeatureManagementSqlScriptProvider.Postgres =>
+        "SELECT COUNT(1) FROM information_schema.tables WHERE table_name = @table",
+      FeatureManagementSqlScriptProvider.MySql =>
+        "SELECT COUNT(1) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = @table",
+      _ =>
+        "SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name = @table"
+    };
+
+    var parameter = command.CreateParameter();
+    parameter.ParameterName = "@table";
+    parameter.Value = tableName;
+    command.Parameters.Add(parameter);
+
+    var count = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+    return count > 0;
+  }
+
+  private static async Task<bool> HasColumnAsync(
+    DbConnection connection,
+    FeatureManagementSqlScriptProvider provider,
+    string tableName,
+    string columnName,
+    CancellationToken cancellationToken)
+  {
+    await using var command = connection.CreateCommand();
+    command.CommandText = provider switch
+    {
+      FeatureManagementSqlScriptProvider.Postgres =>
+        "SELECT COUNT(1) FROM information_schema.columns WHERE table_name = @table AND column_name = @column",
+      FeatureManagementSqlScriptProvider.MySql =>
+        "SELECT COUNT(1) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = @table AND column_name = @column",
+      _ =>
+        $"SELECT COUNT(1) FROM pragma_table_info('{tableName}') WHERE name = @column"
+    };
+
+    if (provider != FeatureManagementSqlScriptProvider.Sqlite)
+    {
+      var tableParameter = command.CreateParameter();
+      tableParameter.ParameterName = "@table";
+      tableParameter.Value = tableName;
+      command.Parameters.Add(tableParameter);
+    }
+
+    var columnParameter = command.CreateParameter();
+    columnParameter.ParameterName = "@column";
+    columnParameter.Value = columnName;
+    command.Parameters.Add(columnParameter);
+
+    var count = Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken) ?? 0L);
+    return count > 0;
   }
 
   private static FeatureManagementSqlScriptProvider ResolveScriptProvider(

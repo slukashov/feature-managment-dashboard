@@ -11,4 +11,5 @@
   <Folder Name="/tests/">
     <Project Path="FeatureManagement.Dashboard.Tests/FeatureManagement.Dashboard.Tests.csproj" />
   </Folder>
+  <Project Path="FeatureManagement.Dashoard.Showcase/FeatureManagement.Dashoard.Showcase.csproj" />
 </Solution>

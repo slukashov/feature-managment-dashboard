@@ -30,8 +30,13 @@ public static class Configuration
     services.AddSingleton<IFeatureDefinitionProvider, DatabaseFeatureDefinitionProvider>();
     services.AddScoped<IValidator<FeatureFlag>, FeatureFlagValidator>();
     services.AddScoped<IGetAllFeatureFlagsUseCase, GetAllFeatureFlagsUseCase>();
+    services.AddScoped<IGetFeatureFlagByNameUseCase, GetFeatureFlagByNameUseCase>();
+    services.AddScoped<IGetFeatureFlagAuditLogUseCase, GetFeatureFlagAuditLogUseCase>();
     services.AddScoped<ICreateFeatureFlagUseCase, CreateFeatureFlagUseCase>();
     services.AddScoped<IUpdateFeatureFlagUseCase, UpdateFeatureFlagUseCase>();
-    return services.AddScoped<IDeleteFeatureFlagUseCase, DeleteFeatureFlagUseCase>();
+    services.AddScoped<IRollbackFeatureFlagUseCase, RollbackFeatureFlagUseCase>();
+    services.AddScoped<IDeleteFeatureFlagUseCase, DeleteFeatureFlagUseCase>();
+    services.AddScoped<IGetFeatureFlagActivityFeedUseCase, GetFeatureFlagActivityFeedUseCase>();
+    return services.AddScoped<IScheduleFeatureFlagChangeUseCase, ScheduleFeatureFlagChangeUseCase>();
   }
 }

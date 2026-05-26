@@ -13,7 +13,7 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
         <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.8" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.300" PrivateAssets="All" />
     </ItemGroup>
     
     <ItemGroup>
@@ -24,8 +24,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <EmbeddedResource Include="$(SpaRoot)dist/**/*" Link="client-app/dist/%(RecursiveDir)%(Filename)%(Extension)" />
-        <EmbeddedResource Include="..\FeatureManagement.Dashboard.Persistence\Database\Scripts\create_feature_management_tables.*.sql"
+        <EmbeddedResource Include="..\FeatureManagement.Dashboard.Persistence\Database\Scripts\*.sql"
                           Link="Database/Scripts/%(Filename)%(Extension)" />
     </ItemGroup>
 
@@ -35,6 +34,19 @@
 
         <Message Importance="high" Text="Building React App..." />
         <Exec Command="npm run build" WorkingDirectory="$(SpaRoot)" />
+    </Target>
+
+    <Target Name="CollectSpaEmbeddedResources"
+            BeforeTargets="_CalculateEmbeddedFilesManifestInputs"
+            DependsOnTargets="BuildReactApp"
+            Condition="Exists('$(SpaRoot)dist/index.html')">
+        <ItemGroup>
+            <SpaDistFile Include="$(SpaRoot)dist/**/*"
+                         Exclude="$(SpaRoot)dist/**/.*" />
+            <EmbeddedResource Include="@(SpaDistFile)">
+                <Link>client-app/dist/%(SpaDistFile.RecursiveDir)%(SpaDistFile.Filename)%(SpaDistFile.Extension)</Link>
+            </EmbeddedResource>
+        </ItemGroup>
     </Target>
 
     <Target Name="ValidateSpaDistForPack" BeforeTargets="Pack"

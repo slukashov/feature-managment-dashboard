@@ -175,8 +175,15 @@ public static class FeatureManagementUiExtensions
   {
     var group = endpoints.MapGroup(routePrefix);
     group.MapGet("/", FeatureFlagEndpointHandlers.GetAllAsync).RequireFeatureManagement(accessRequirement);
+    group.MapGet("/{name}", FeatureFlagEndpointHandlers.GetByNameAsync).RequireFeatureManagement(accessRequirement);
+    group.MapGet("/{name}/audit", FeatureFlagEndpointHandlers.GetAuditAsync).RequireFeatureManagement(accessRequirement);
+    group.MapGet("/{name}/activity", FeatureFlagEndpointHandlers.GetActivityAsync).RequireFeatureManagement(accessRequirement);
     group.MapPost("/", FeatureFlagEndpointHandlers.CreateAsync).RequireFeatureManagement(accessRequirement);
     group.MapPut("/{name}", FeatureFlagEndpointHandlers.UpdateAsync).RequireFeatureManagement(accessRequirement);
+    group.MapPost("/{name}/rollback/{targetVersion:int}", FeatureFlagEndpointHandlers.RollbackAsync)
+      .RequireFeatureManagement(accessRequirement);
+    group.MapPost("/{name}/schedule", FeatureFlagEndpointHandlers.ScheduleAsync)
+      .RequireFeatureManagement(accessRequirement);
     group.MapDelete("/{name}", FeatureFlagEndpointHandlers.DeleteAsync).RequireFeatureManagement(accessRequirement);
     return endpoints;
   }

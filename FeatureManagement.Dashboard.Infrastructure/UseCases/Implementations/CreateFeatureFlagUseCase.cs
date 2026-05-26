@@ -22,12 +22,38 @@ internal sealed class CreateFeatureFlagUseCase(
     if (await context.FeatureFlags.AnyAsync(featureFlag => featureFlag.Name == flag.Name, cancellationToken))
       throw new FeatureFlagAlreadyExistsException(flag.Name);
 
+    flag.Owner = flag.Owner.Trim();
+    flag.Tags = (flag.Tags ?? [])
+      .Where(tag => !string.IsNullOrWhiteSpace(tag))
+      .Select(tag => tag.Trim())
+      .Distinct(StringComparer.OrdinalIgnoreCase)
+      .ToList();
+
     flag.Version = Models.Constants.DefaultVersion;
     flag.UpdatedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
     foreach (var filter in flag.EnabledFor)
       filter.FeatureFlagName = flag.Name;
 
     context.FeatureFlags.Add(flag);
+    context.FeatureFlagAuditLogs.Add(new FeatureFlagAuditLog
+    {
+      FeatureFlagName = flag.Name,
+      Action = FeatureFlagAuditAction.Created,
+      SnapshotVersion = flag.Version,
+      SnapshotJson = FeatureFlagAuditSnapshotSerializer.Serialize(flag),
+      ChangedAtUtc = flag.UpdatedAtUtc,
+      ChangedBy = "system"
+    });
+    context.FeatureFlagActivityEntries.Add(new FeatureFlagActivityEntry
+    {
+      FeatureFlagName = flag.Name,
+      ActivityType = "Created",
+      Description = "Feature flag created.",
+      ChangeType = null,
+      ChangedAtUtc = flag.UpdatedAtUtc,
+      ChangedBy = "system"
+    });
+
     await context.SaveChangesAsync(cancellationToken);
     cacheState.Bump();
     return flag;

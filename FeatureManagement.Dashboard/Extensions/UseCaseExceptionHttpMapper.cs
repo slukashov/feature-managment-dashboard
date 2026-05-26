@@ -19,6 +19,9 @@ internal static class UseCaseExceptionHttpMapper
       case FeatureFlagNotFoundException:
         result = Results.NotFound();
         return true;
+      case FeatureFlagRollbackVersionNotFoundException rollbackException:
+        result = Results.NotFound(new { error = rollbackException.Message });
+        return true;
       case FeatureFlagVersionConflictException versionConflictException:
         result = Results.Conflict(new
         {

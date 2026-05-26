@@ -9,6 +9,8 @@ internal class FeatureManagementContext(DbContextOptions<FeatureManagementContex
 {
   public DbSet<FeatureFlag> FeatureFlags => Set<FeatureFlag>();
   public DbSet<FeatureFilter> FeatureFilters => Set<FeatureFilter>();
+  public DbSet<FeatureFlagAuditLog> FeatureFlagAuditLogs => Set<FeatureFlagAuditLog>();
+  public DbSet<FeatureFlagActivityEntry> FeatureFlagActivityEntries => Set<FeatureFlagActivityEntry>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {

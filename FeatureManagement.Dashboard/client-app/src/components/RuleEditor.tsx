@@ -6,10 +6,10 @@ import dayjs, { Dayjs } from 'dayjs';
 import { FeatureFilter } from '../types/featureFlags';
 
 interface RuleEditorProps {
-    filter: FeatureFilter;
-    index: number;
-    onUpdate: (index: number, updatedFilter: FeatureFilter) => void;
-    onRemove: (index: number) => void;
+    readonly filter: FeatureFilter;
+    readonly index: number;
+    readonly onUpdate: (index: number, updatedFilter: FeatureFilter) => void;
+    readonly onRemove: (index: number) => void;
 }
 
 export default function RuleEditor({ filter, index, onUpdate, onRemove }: RuleEditorProps) {
@@ -22,6 +22,7 @@ export default function RuleEditor({ filter, index, onUpdate, onRemove }: RuleEd
         let newParams = '{}';
         if (newName === 'Microsoft.Percentage') newParams = JSON.stringify({ Value: 50 });
         else if (newName === 'Microsoft.TimeWindow') newParams = JSON.stringify({ Start: '', End: '' });
+        else if (newName === 'Microsoft.Targeting') newParams = JSON.stringify({ Audience: { Users: [], Groups: [], Roles: [], IpRanges: [], CustomAttributes: {}, DefaultRolloutPercentage: 0 } });
         onUpdate(index, { ...filter, name: newName, parametersJson: newParams });
     };
 
@@ -42,7 +43,43 @@ export default function RuleEditor({ filter, index, onUpdate, onRemove }: RuleEd
 
     const isTimeWindow = filter.name === 'Microsoft.TimeWindow';
     const isPercentage = filter.name === 'Microsoft.Percentage';
-    const isCustom = filter.name !== 'AlwaysOn' && !isPercentage && !isTimeWindow;
+    const isTargeting = filter.name === 'Microsoft.Targeting';
+    const isCustom = filter.name !== 'AlwaysOn' && !isPercentage && !isTimeWindow && !isTargeting;
+
+    const targetingAudience = params?.Audience && typeof params.Audience === 'object' ? params.Audience : {};
+    const targetingUsers = Array.isArray(targetingAudience.Users)
+        ? targetingAudience.Users.filter((user: unknown): user is string => typeof user === 'string')
+        : [];
+    const targetingGroups = Array.isArray(targetingAudience.Groups)
+        ? targetingAudience.Groups.filter((group: unknown) => group && typeof group === 'object')
+        : [];
+    const targetingRoles = Array.isArray(targetingAudience.Roles)
+        ? targetingAudience.Roles.filter((role: unknown): role is string => typeof role === 'string')
+        : [];
+    const targetingIpRanges = Array.isArray(targetingAudience.IpRanges)
+        ? targetingAudience.IpRanges.filter((ip: unknown): ip is string => typeof ip === 'string')
+        : [];
+    const targetingCustomAttributes = targetingAudience.CustomAttributes && typeof targetingAudience.CustomAttributes === 'object'
+        ? targetingAudience.CustomAttributes
+        : {};
+    const targetingDefaultRollout = typeof targetingAudience.DefaultRolloutPercentage === 'number'
+        ? targetingAudience.DefaultRolloutPercentage
+        : 0;
+
+    const updateTargetingAudience = (audiencePatch: Record<string, unknown>) => {
+        updateParams({
+            Audience: {
+                Users: targetingUsers,
+                Groups: targetingGroups,
+                Roles: targetingRoles,
+                IpRanges: targetingIpRanges,
+                CustomAttributes: targetingCustomAttributes,
+                DefaultRolloutPercentage: targetingDefaultRollout,
+                ...targetingAudience,
+                ...audiencePatch
+            }
+        });
+    };
 
     return (
         <Card variant="outlined" sx={{ mb: 2, bgcolor: 'background.paper' }}>
@@ -58,6 +95,7 @@ export default function RuleEditor({ filter, index, onUpdate, onRemove }: RuleEd
                     >
                         <MenuItem value="AlwaysOn">Simple: Always On (True)</MenuItem>
                         <MenuItem value="Microsoft.Percentage">Percentage Rollout</MenuItem>
+                        <MenuItem value="Microsoft.Targeting">Segment Targeting</MenuItem>
                         <MenuItem value="Microsoft.TimeWindow">Time Window</MenuItem>
                         <MenuItem value="Custom">Custom / Advanced</MenuItem>
                     </TextField>
@@ -74,7 +112,7 @@ export default function RuleEditor({ filter, index, onUpdate, onRemove }: RuleEd
                         size="small"
                         slotProps={{ htmlInput: { min: 0, max: 100 } }}
                         value={params.Value !== undefined ? params.Value : 50}
-                        onChange={(e) => updateParams({ Value: parseInt(e.target.value, 10) || 0 })}
+                        onChange={(e) => updateParams({ Value: Number.parseInt(e.target.value, 10) || 0 })}
                     />
                 )}
 
@@ -91,6 +129,122 @@ export default function RuleEditor({ filter, index, onUpdate, onRemove }: RuleEd
                             value={toPickerValue(params.End)}
                             onChange={(value) => updateParams({ ...params, End: toStorageValue(value) })}
                             slotProps={{ textField: { fullWidth: true, size: 'small' } }}
+                        />
+                    </Stack>
+                )}
+
+                {isTargeting && (
+                    <Stack spacing={2}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            label="Users (comma-separated)"
+                            value={targetingUsers.join(', ')}
+                            onChange={(e) => {
+                                const users = e.target.value
+                                    .split(',')
+                                    .map((item) => item.trim())
+                                    .filter(Boolean);
+                                updateTargetingAudience({ Users: users });
+                            }}
+                        />
+
+                        <TextField
+                            type="number"
+                            fullWidth
+                            size="small"
+                            label="Default Rollout Percentage (0-100)"
+                            slotProps={{ htmlInput: { min: 0, max: 100 } }}
+                            value={targetingDefaultRollout}
+                            onChange={(e) => {
+                                const value = parseInt(e.target.value, 10);
+                                updateTargetingAudience({
+                                    DefaultRolloutPercentage: Number.isNaN(value) ? 0 : value
+                                });
+                            }}
+                        />
+
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={3}
+                            size="small"
+                            label="Groups (JSON array)"
+                            helperText='Example: [{"Name":"beta","RolloutPercentage":50}]'
+                            value={JSON.stringify(targetingGroups)}
+                            onChange={(e) => {
+                                try {
+                                    const groups = JSON.parse(e.target.value || '[]');
+                                    if (Array.isArray(groups)) {
+                                        updateTargetingAudience({ Groups: groups });
+                                    }
+                                } catch {
+                                    onUpdate(index, {
+                                        ...filter,
+                                        parametersJson: JSON.stringify({
+                                            Audience: {
+                                                ...targetingAudience,
+                                                Users: targetingUsers,
+                                                Roles: targetingRoles,
+                                                IpRanges: targetingIpRanges,
+                                                CustomAttributes: targetingCustomAttributes,
+                                                DefaultRolloutPercentage: targetingDefaultRollout,
+                                                Groups: e.target.value
+                                            }
+                                        })
+                                    });
+                                }
+                            }}
+                        />
+
+                        <TextField
+                            fullWidth
+                            size="small"
+                            label="Roles (comma-separated)"
+                            placeholder="e.g. admin, premium-user, beta-tester"
+                            value={targetingRoles.join(', ')}
+                            onChange={(e) => {
+                                const roles = e.target.value
+                                    .split(',')
+                                    .map((item) => item.trim())
+                                    .filter(Boolean);
+                                updateTargetingAudience({ Roles: roles });
+                            }}
+                        />
+
+                        <TextField
+                            fullWidth
+                            size="small"
+                            label="IP Ranges (comma-separated)"
+                            placeholder="e.g. 192.168.1.0/24, 10.0.0.0/8"
+                            value={targetingIpRanges.join(', ')}
+                            onChange={(e) => {
+                                const ranges = e.target.value
+                                    .split(',')
+                                    .map((item) => item.trim())
+                                    .filter(Boolean);
+                                updateTargetingAudience({ IpRanges: ranges });
+                            }}
+                        />
+
+                        <TextField
+                            fullWidth
+                            multiline
+                            rows={2}
+                            size="small"
+                            label="Custom Attributes (JSON)"
+                            placeholder='{"region":["US","EU"],"subscription":"premium"}'
+                            value={JSON.stringify(targetingCustomAttributes)}
+                            onChange={(e) => {
+                                try {
+                                    const attrs = JSON.parse(e.target.value || '{}');
+                                    if (typeof attrs === 'object' && attrs !== null) {
+                                        updateTargetingAudience({ CustomAttributes: attrs });
+                                    }
+                                } catch {
+                                    // Invalid JSON, do nothing
+                                }
+                            }}
                         />
                     </Stack>
                 )}
