@@ -6,7 +6,6 @@
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferencesInPackage</TargetsForTfmSpecificBuildOutput>
         <SpaRoot>client-app/</SpaRoot>
-        <RepositoryUrl>https://github.com/slukashov/feature-managment-dashboard.git</RepositoryUrl>
         <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
         <SkipClientAppBuild Condition="'$(SkipClientAppBuild)' == ''">false</SkipClientAppBuild>
     </PropertyGroup>
@@ -14,17 +13,18 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.8" />
         <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.8" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
     </ItemGroup>
     
     <ItemGroup>
         <Content Remove="$(SpaRoot)**" />
         <None Remove="$(SpaRoot)**" />
-        <None Include="$(SpaRoot)**" Exclude="$(SpaRoot)node_modules\**" />
+        <None Include="$(SpaRoot)**" Exclude="$(SpaRoot)node_modules/**" />
         <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
     </ItemGroup>
 
     <ItemGroup>
-        <EmbeddedResource Include="$(SpaRoot)dist\**\*" Link="client-app/dist/%(RecursiveDir)%(Filename)%(Extension)" />
+        <EmbeddedResource Include="$(SpaRoot)dist/**/*" Link="client-app/dist/%(RecursiveDir)%(Filename)%(Extension)" />
         <EmbeddedResource Include="..\FeatureManagement.Dashboard.Persistence\Database\Scripts\create_feature_management_tables.*.sql"
                           Link="Database/Scripts/%(Filename)%(Extension)" />
     </ItemGroup>
