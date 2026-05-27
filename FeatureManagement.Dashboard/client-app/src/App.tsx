@@ -32,21 +32,21 @@ interface ToastState {
 
 export default function App() {
     const getSystemMode = (): 'light' | 'dark' => {
-        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+        if (typeof globalThis.matchMedia !== 'function') {
             return 'light';
         }
 
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     };
 
     const [mode, setMode] = useState<'light' | 'dark'>(getSystemMode);
 
     useEffect(() => {
-        if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+        if (typeof globalThis.matchMedia !== 'function') {
             return;
         }
 
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const mediaQuery = globalThis.matchMedia('(prefers-color-scheme: dark)');
         const updateThemeMode = (event: MediaQueryListEvent) => {
             setMode(event.matches ? 'dark' : 'light');
         };
@@ -125,7 +125,7 @@ export default function App() {
     }, []);
 
      // Custom Hook
-     const { flags, isLoading, saveFlag, toggleFlag, getAuditHistory, rollbackFlag, deleteFlag, getActivityFeed, scheduleChange } = useFeatureFlags(showNotification);
+     const { flags, isLoading, saveFlag, toggleFlag, getAuditHistory, rollbackFlag, deleteFlag, getActivityFeed } = useFeatureFlags(showNotification);
 
     // Handlers
     const handleAddClick = () => {
@@ -174,7 +174,7 @@ export default function App() {
     };
 
      const handleDelete = async (flag: FeatureFlag) => {
-         const approved = window.confirm(`Delete feature flag "${flag.name}"? This action cannot be undone.`);
+         const approved = globalThis.confirm(`Delete feature flag "${flag.name}"? This action cannot be undone.`);
          if (!approved) {
              return;
          }

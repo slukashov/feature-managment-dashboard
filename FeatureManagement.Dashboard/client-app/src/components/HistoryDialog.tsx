@@ -16,13 +16,13 @@ import {
 import { FeatureFlagAuditLog } from '../types/featureFlags';
 
 interface HistoryDialogProps {
-    open: boolean;
-    featureName: string;
-    auditEntries: FeatureFlagAuditLog[];
-    isLoading: boolean;
-    isRollingBack: boolean;
-    onClose: () => void;
-    onRollback: (targetVersion: number) => Promise<void>;
+    readonly open: boolean;
+    readonly featureName: string;
+    readonly auditEntries: FeatureFlagAuditLog[];
+    readonly isLoading: boolean;
+    readonly isRollingBack: boolean;
+    readonly onClose: () => void;
+    readonly onRollback: (targetVersion: number) => Promise<void>;
 }
 
 const actionLabels: Record<number, string> = {

@@ -9,7 +9,6 @@ import {
     DialogTitle,
     List,
     ListItem,
-    ListItemText,
     Stack,
     Typography,
     Chip
@@ -17,11 +16,11 @@ import {
 import { FeatureFlagActivityEntry } from '../types/featureFlags';
 
 interface ActivityFeedDialogProps {
-    open: boolean;
-    featureName: string;
-    activityEntries: FeatureFlagActivityEntry[];
-    isLoading: boolean;
-    onClose: () => void;
+    readonly open: boolean;
+    readonly featureName: string;
+    readonly activityEntries: FeatureFlagActivityEntry[];
+    readonly isLoading: boolean;
+    readonly onClose: () => void;
 }
 
 const activityTypeColors: Record<string, 'default' | 'primary' | 'success' | 'warning' | 'error'> = {

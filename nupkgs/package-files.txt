@@ -1,0 +1,14 @@
+Archive:  ./nupkgs/FeatureManagement.Dashboard.1.0.2.nupkg
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+      517  05-27-2026 05:58   _rels/.rels
+      866  05-27-2026 05:58   FeatureManagement.Dashboard.nuspec
+    53248  05-27-2026 03:58   lib/net10.0/FeatureManagement.Dashboard.Infrastructure.dll
+    11776  05-27-2026 03:58   lib/net10.0/FeatureManagement.Dashboard.Models.dll
+    13824  05-27-2026 03:58   lib/net10.0/FeatureManagement.Dashboard.Persistence.dll
+   807424  05-27-2026 03:58   lib/net10.0/FeatureManagement.Dashboard.dll
+     6301  05-26-2026 19:52   README.md
+      520  05-27-2026 05:58   [Content_Types].xml
+      770  05-27-2026 05:58   package/services/metadata/core-properties/6e7e0437eb0d4501ab6b54c6e8f888bd.psmdcp
+---------                     -------
+   895246                     9 files

@@ -44,7 +44,9 @@ export default function RuleEditor({ filter, index, onUpdate, onRemove }: RuleEd
     const isTimeWindow = filter.name === 'Microsoft.TimeWindow';
     const isPercentage = filter.name === 'Microsoft.Percentage';
     const isTargeting = filter.name === 'Microsoft.Targeting';
-    const isCustom = filter.name !== 'AlwaysOn' && !isPercentage && !isTimeWindow && !isTargeting;
+    const isAlwaysOn = filter.name === 'AlwaysOn';
+    const isBuiltIn = isAlwaysOn || isPercentage || isTimeWindow || isTargeting;
+    const isCustom = isBuiltIn === false;
 
     const targetingAudience = params?.Audience && typeof params.Audience === 'object' ? params.Audience : {};
     const targetingUsers = Array.isArray(targetingAudience.Users)
@@ -157,7 +159,7 @@ export default function RuleEditor({ filter, index, onUpdate, onRemove }: RuleEd
                             slotProps={{ htmlInput: { min: 0, max: 100 } }}
                             value={targetingDefaultRollout}
                             onChange={(e) => {
-                                const value = parseInt(e.target.value, 10);
+                                const value = Number.parseInt(e.target.value, 10);
                                 updateTargetingAudience({
                                     DefaultRolloutPercentage: Number.isNaN(value) ? 0 : value
                                 });

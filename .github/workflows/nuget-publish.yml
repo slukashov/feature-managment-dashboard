@@ -82,6 +82,8 @@ jobs:
           grep -q "lib/net10.0/FeatureManagement.Dashboard.Infrastructure.dll" ./nupkgs/package-files.txt
           grep -q "lib/net10.0/FeatureManagement.Dashboard.Models.dll" ./nupkgs/package-files.txt
           grep -q "lib/net10.0/FeatureManagement.Dashboard.Persistence.dll" ./nupkgs/package-files.txt
-          grep -q "lib/net10.0/client-app/dist/index.html" ./nupkgs/package-files.txt
+
+          # SPA files are embedded into FeatureManagement.Dashboard.dll, not packed as loose files.
+          test -f ./FeatureManagement.Dashboard/client-app/dist/index.html
       - name: Push to NuGet.org
         run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
