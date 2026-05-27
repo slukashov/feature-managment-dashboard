@@ -7,7 +7,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <Version>1.0.2</Version>
+        <Version>1.0.2.1</Version>
         <Authors>slukashov</Authors>
         <Description>Feature Management Dashboard for ASP.NET Core</Description>
         <PackageProjectUrl>https://github.com/slukashov/feature-managment-dashboard</PackageProjectUrl>
