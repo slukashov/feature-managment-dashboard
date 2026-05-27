@@ -3,6 +3,7 @@ name: Build, Test, and Publish NuGet
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request: 
 jobs:
   build-test-publish:
@@ -43,7 +44,7 @@ jobs:
       
   publish:
     needs: build-test-publish
-    if: github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -86,4 +87,6 @@ jobs:
           # SPA files are embedded into FeatureManagement.Dashboard.dll, not packed as loose files.
           test -f ./FeatureManagement.Dashboard/client-app/dist/index.html
       - name: Push to NuGet.org
-        run: dotnet nuget push ./nupkgs/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+        env:
+          SECRET: ${{ secrets.NUGET_API_KEY }}
+        run: dotnet nuget push ./nupkgs/*.nupkg --api-key "$SECRET" --source https://api.nuget.org/v3/index.json --skip-duplicate
