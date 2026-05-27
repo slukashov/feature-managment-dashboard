@@ -105,8 +105,6 @@ public class FeatureManagementRelationalInitializationTests
           CREATE TABLE IF NOT EXISTS "FeatureFlags"
           (
             "Name" TEXT PRIMARY KEY,
-            "Owner" TEXT NOT NULL DEFAULT '',
-            "TagsJson" TEXT NOT NULL DEFAULT '[]',
             "RequirementType" INTEGER NOT NULL,
             "Version" INTEGER NOT NULL DEFAULT 1,
             "UpdatedAtUtc" TEXT NOT NULL
@@ -143,6 +141,18 @@ public class FeatureManagementRelationalInitializationTests
       "SELECT COUNT(1) FROM pragma_table_info('FeatureFlags') WHERE name = 'ScheduledAtUtc';";
     var scheduledColumnExists = (long)(await columnCommand.ExecuteScalarAsync() ?? 0L);
     Assert.Equal(1L, scheduledColumnExists);
+
+    await using var ownerColumnCommand = host.Connection.CreateCommand();
+    ownerColumnCommand.CommandText =
+      "SELECT COUNT(1) FROM pragma_table_info('FeatureFlags') WHERE name = 'Owner';";
+    var ownerColumnExists = (long)(await ownerColumnCommand.ExecuteScalarAsync() ?? 0L);
+    Assert.Equal(1L, ownerColumnExists);
+
+    await using var tagsColumnCommand = host.Connection.CreateCommand();
+    tagsColumnCommand.CommandText =
+      "SELECT COUNT(1) FROM pragma_table_info('FeatureFlags') WHERE name = 'TagsJson';";
+    var tagsColumnExists = (long)(await tagsColumnCommand.ExecuteScalarAsync() ?? 0L);
+    Assert.Equal(1L, tagsColumnExists);
 
     await using var tableCommand = host.Connection.CreateCommand();
     tableCommand.CommandText =

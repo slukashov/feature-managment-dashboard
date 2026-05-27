@@ -5,26 +5,22 @@
 
 BEGIN TRANSACTION;
 
--- Add ScheduledAtUtc column to FeatureFlags table
-ALTER TABLE IF EXISTS "FeatureFlags" ADD COLUMN IF NOT EXISTS "ScheduledAtUtc" TEXT;
-ALTER TABLE IF EXISTS "FeatureFlags" ADD COLUMN IF NOT EXISTS "Owner" TEXT NOT NULL DEFAULT '';
-ALTER TABLE IF EXISTS "FeatureFlags" ADD COLUMN IF NOT EXISTS "TagsJson" TEXT NOT NULL DEFAULT '[]';
 
 -- Create FeatureFlagActivityEntries table if it doesn't exist
 CREATE TABLE IF NOT EXISTS "FeatureFlagActivityEntries"
 (
-  "Id" INTEGER PRIMARY KEY AUTOINCREMENT,
-  "FeatureFlagName" TEXT NOT NULL,
-  "ActivityType" TEXT NOT NULL,
-  "Description" TEXT NOT NULL,
-  "ChangeType" TEXT,
-  "ChangedAtUtc" TEXT NOT NULL,
-  "ChangedBy" TEXT NOT NULL
+    "Id"              INTEGER PRIMARY KEY AUTOINCREMENT,
+    "FeatureFlagName" TEXT NOT NULL,
+    "ActivityType"    TEXT NOT NULL,
+    "Description"     TEXT NOT NULL,
+    "ChangeType"      TEXT,
+    "ChangedAtUtc"    TEXT NOT NULL,
+    "ChangedBy"       TEXT NOT NULL
 );
 
 -- Create index if it doesn't exist
 CREATE INDEX IF NOT EXISTS "IX_FeatureFlagActivityEntries_FeatureFlagName_Id"
-  ON "FeatureFlagActivityEntries" ("FeatureFlagName", "Id");
+    ON "FeatureFlagActivityEntries" ("FeatureFlagName", "Id");
 
 COMMIT;
 
