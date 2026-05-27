@@ -130,7 +130,7 @@ describe('App', () => {
      mockRollbackFlag.mockResolvedValue(true);
      mockDeleteFlag.mockResolvedValue(true);
      mockGetActivityFeed.mockResolvedValue([]);
-     vi.spyOn(window, 'confirm').mockReturnValue(true);
+     vi.spyOn(globalThis, 'confirm').mockReturnValue(true);
      capturedNotify = undefined;
    });
 
@@ -280,7 +280,7 @@ describe('App', () => {
      fireEvent.click(screen.getByRole('button', { name: 'delete-flag' }));
 
      await waitFor(() => {
-       expect(window.confirm).toHaveBeenCalledWith('Delete feature flag "beta-flag"? This action cannot be undone.');
+       expect(globalThis.confirm).toHaveBeenCalledWith('Delete feature flag "beta-flag"? This action cannot be undone.');
        expect(mockDeleteFlag).toHaveBeenCalledWith('beta-flag');
      });
    });
