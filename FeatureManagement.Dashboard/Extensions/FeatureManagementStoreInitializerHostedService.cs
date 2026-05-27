@@ -100,6 +100,12 @@ internal sealed class FeatureManagementStoreInitializerHostedService(
         }
       }
 
+      if (provider == FeatureManagementSqlScriptProvider.Sqlite &&
+          scriptName == "migrate_sqlite_add_scheduled_and_activity.sql")
+      {
+        await EnsureSqliteScheduledAndActivityColumnsAsync(connection, cancellationToken);
+      }
+
       var sql = ReadEmbeddedScript(scriptName);
       await using (var command = connection.CreateCommand())
       {
@@ -108,6 +114,26 @@ internal sealed class FeatureManagementStoreInitializerHostedService(
       }
 
       await MarkMigrationAppliedAsync(connection, provider, scriptName, cancellationToken);
+    }
+  }
+
+  private static async Task EnsureSqliteScheduledAndActivityColumnsAsync(
+    DbConnection connection,
+    CancellationToken cancellationToken)
+  {
+    if (!await HasColumnAsync(connection, FeatureManagementSqlScriptProvider.Sqlite, "FeatureFlags", "ScheduledAtUtc", cancellationToken))
+    {
+      await ExecuteNonQueryAsync(connection, "ALTER TABLE \"FeatureFlags\" ADD COLUMN \"ScheduledAtUtc\" TEXT;", cancellationToken);
+    }
+
+    if (!await HasColumnAsync(connection, FeatureManagementSqlScriptProvider.Sqlite, "FeatureFlags", "Owner", cancellationToken))
+    {
+      await ExecuteNonQueryAsync(connection, "ALTER TABLE \"FeatureFlags\" ADD COLUMN \"Owner\" TEXT NOT NULL DEFAULT '';", cancellationToken);
+    }
+
+    if (!await HasColumnAsync(connection, FeatureManagementSqlScriptProvider.Sqlite, "FeatureFlags", "TagsJson", cancellationToken))
+    {
+      await ExecuteNonQueryAsync(connection, "ALTER TABLE \"FeatureFlags\" ADD COLUMN \"TagsJson\" TEXT NOT NULL DEFAULT '[]';", cancellationToken);
     }
   }
 
@@ -189,6 +215,16 @@ internal sealed class FeatureManagementStoreInitializerHostedService(
       : DateTime.UtcNow;
     command.Parameters.Add(appliedAtParameter);
 
+    await command.ExecuteNonQueryAsync(cancellationToken);
+  }
+
+  private static async Task ExecuteNonQueryAsync(
+    DbConnection connection,
+    string sql,
+    CancellationToken cancellationToken)
+  {
+    await using var command = connection.CreateCommand();
+    command.CommandText = sql;
     await command.ExecuteNonQueryAsync(cancellationToken);
   }
 
