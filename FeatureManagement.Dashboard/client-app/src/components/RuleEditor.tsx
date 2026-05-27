@@ -113,7 +113,7 @@ export default function RuleEditor({ filter, index, onUpdate, onRemove }: RuleEd
                         label="Percentage (0-100)"
                         size="small"
                         slotProps={{ htmlInput: { min: 0, max: 100 } }}
-                        value={params.Value !== undefined ? params.Value : 50}
+                        value={params.Value === undefined ? 50 : params.Value}
                         onChange={(e) => updateParams({ Value: Number.parseInt(e.target.value, 10) || 0 })}
                     />
                 )}

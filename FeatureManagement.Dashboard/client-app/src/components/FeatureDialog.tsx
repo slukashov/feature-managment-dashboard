@@ -30,6 +30,7 @@ export default function FeatureDialog({open, onClose, onSave, initialData, isNew
     const [flag, setFlag] = useState<FeatureFlag>({name: '', owner: '', tags: [], requirementType: 0, enabledFor: []});
     const [tagsInput, setTagsInput] = useState<string>('');
     const ruleKeyMapRef = useRef<WeakMap<FeatureFilter, string>>(new WeakMap());
+    const ruleKeyCounterRef = useRef(0);
 
     const getRuleKey = (filter: FeatureFilter): string => {
         const existingKey = ruleKeyMapRef.current.get(filter);
@@ -37,7 +38,8 @@ export default function FeatureDialog({open, onClose, onSave, initialData, isNew
             return existingKey;
         }
 
-        const generatedKey = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const generatedKey = `${Date.now()}-${ruleKeyCounterRef.current}`;
+        ruleKeyCounterRef.current += 1;
         ruleKeyMapRef.current.set(filter, generatedKey);
         return generatedKey;
     };
