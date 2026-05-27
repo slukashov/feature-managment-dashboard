@@ -6,7 +6,9 @@
 BEGIN TRANSACTION;
 
 -- Add ScheduledAtUtc column to FeatureFlags table
-ALTER TABLE "FeatureFlags" ADD COLUMN "ScheduledAtUtc" TEXT;
+ALTER TABLE IF EXISTS "FeatureFlags" ADD COLUMN IF NOT EXISTS "ScheduledAtUtc" TEXT;
+ALTER TABLE IF EXISTS "FeatureFlags" ADD COLUMN IF NOT EXISTS "Owner" TEXT NOT NULL DEFAULT '';
+ALTER TABLE IF EXISTS "FeatureFlags" ADD COLUMN IF NOT EXISTS "TagsJson" TEXT NOT NULL DEFAULT '[]';
 
 -- Create FeatureFlagActivityEntries table if it doesn't exist
 CREATE TABLE IF NOT EXISTS "FeatureFlagActivityEntries"

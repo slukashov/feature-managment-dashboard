@@ -8,6 +8,8 @@ BEGIN;
 -- Add ScheduledAtUtc column to FeatureFlags table
 -- If the column already exists, this will fail; you can safely ignore the error
 ALTER TABLE IF EXISTS "FeatureFlags" ADD COLUMN IF NOT EXISTS "ScheduledAtUtc" timestamp with time zone;
+ALTER TABLE IF EXISTS "FeatureFlags" ADD COLUMN IF NOT EXISTS "Owner" TEXT NOT NULL DEFAULT '';
+ALTER TABLE IF EXISTS "FeatureFlags" ADD COLUMN IF NOT EXISTS "TagsJson" text NOT NULL DEFAULT '[]';
 
 -- Create FeatureFlagActivityEntries table if it doesn't exist
 CREATE TABLE IF NOT EXISTS "FeatureFlagActivityEntries"

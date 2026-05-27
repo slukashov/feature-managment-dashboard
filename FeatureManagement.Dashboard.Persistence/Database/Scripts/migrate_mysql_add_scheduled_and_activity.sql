@@ -8,6 +8,7 @@ START TRANSACTION;
 -- Add ScheduledAtUtc column to FeatureFlags table
 -- If the column already exists, this will fail; you can safely ignore the error
 ALTER TABLE IF EXISTS `FeatureFlags` ADD COLUMN IF NOT EXISTS `ScheduledAtUtc` datetime(6);
+ALTER TABLE IF EXISTS `FeatureFlags` ADD COLUMN IF NOT EXISTS`TagsJson` longtext NOT NULL DEFAULT ('[]');
 
 -- Create FeatureFlagActivityEntries table if it doesn't exist
 CREATE TABLE IF NOT EXISTS `FeatureFlagActivityEntries`
