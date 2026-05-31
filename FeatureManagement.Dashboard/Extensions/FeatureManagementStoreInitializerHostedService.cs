@@ -35,6 +35,12 @@ internal sealed class FeatureManagementStoreInitializerHostedService(
 
   public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
+  // A stable, application-specific key used for pg_advisory_lock so that concurrent instances
+  // never run schema migrations at the same time (prevents deadlocks when the pg_anon extension
+  // is active, because every DDL statement fires anon.trg_mask_update() which contends on
+  // exclusive locks over the same masking views).
+  private const long PostgresAdvisoryLockKey = 7_369_876_543L;
+
   private async Task ExecuteSqlScriptAsync(IFeatureManagementContext db, CancellationToken cancellationToken)
   {
     var provider = ResolveScriptProvider(schemaOptions.SqlScriptProvider, db.Database.ProviderName);
@@ -47,12 +53,27 @@ internal sealed class FeatureManagementStoreInitializerHostedService(
       await connection.OpenAsync(cancellationToken);
     }
 
-    await using var command = connection.CreateCommand();
-    command.CommandText = sql;
-    await command.ExecuteNonQueryAsync(cancellationToken);
+    if (provider == FeatureManagementSqlScriptProvider.Postgres)
+    {
+      await ExecuteNonQueryAsync(connection, $"SELECT pg_advisory_lock({PostgresAdvisoryLockKey})", cancellationToken);
+    }
 
-    await EnsureMigrationHistoryTableAsync(connection, provider, cancellationToken);
-    await ApplyPendingMigrationsAsync(connection, provider, cancellationToken);
+    try
+    {
+      await using var command = connection.CreateCommand();
+      command.CommandText = sql;
+      await command.ExecuteNonQueryAsync(cancellationToken);
+
+      await EnsureMigrationHistoryTableAsync(connection, provider, cancellationToken);
+      await ApplyPendingMigrationsAsync(connection, provider, cancellationToken);
+    }
+    finally
+    {
+      if (provider == FeatureManagementSqlScriptProvider.Postgres)
+      {
+        await ExecuteNonQueryAsync(connection, $"SELECT pg_advisory_unlock({PostgresAdvisoryLockKey})", cancellationToken);
+      }
+    }
   }
 
   private static async Task EnsureMigrationHistoryTableAsync(

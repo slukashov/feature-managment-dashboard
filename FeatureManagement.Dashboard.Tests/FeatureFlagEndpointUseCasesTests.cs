@@ -343,6 +343,74 @@ public sealed class FeatureFlagEndpointUseCasesTests
   }
 
   [Fact]
+  public async Task Experiment_use_cases_configure_track_and_recommend_winner()
+  {
+    using var provider = CreateProvider(new FixedTimeProvider(new DateTimeOffset(2026, 5, 26, 10, 0, 0, TimeSpan.Zero)));
+    await using var scope = provider.CreateAsyncScope();
+    var createUseCase = scope.ServiceProvider.GetRequiredService<ICreateFeatureFlagUseCase>();
+    var configureUseCase = scope.ServiceProvider.GetRequiredService<IConfigureFeatureFlagExperimentUseCase>();
+    var assignUseCase = scope.ServiceProvider.GetRequiredService<IAssignFeatureFlagExperimentVariantUseCase>();
+    var recordUseCase = scope.ServiceProvider.GetRequiredService<IRecordFeatureFlagExperimentOutcomeUseCase>();
+    var recommendationUseCase = scope.ServiceProvider.GetRequiredService<IGetFeatureFlagExperimentRecommendationUseCase>();
+
+    await createUseCase.ExecuteAsync(BuildValidFlag("beta-dashboard", RequirementType.Any, "{\"Value\":10}"));
+
+    var experiment = await configureUseCase.ExecuteAsync("beta-dashboard", new FeatureFlagExperimentConfiguration
+    {
+      BaselineVariant = "A",
+      ChallengerVariant = "B",
+      BaselineTrafficPercentage = 50,
+      ChallengerTrafficPercentage = 50,
+      ConversionMetricName = "checkout_conversion",
+      LatencyMetricName = "checkout_latency_ms",
+      MinimumSampleSize = 2,
+      IsActive = true
+    });
+
+    Assert.Equal("A", experiment.BaselineVariant);
+    Assert.Equal("B", experiment.ChallengerVariant);
+
+    var assignment = await assignUseCase.ExecuteAsync("beta-dashboard", "user-42");
+    Assert.True(assignment.Variant is "A" or "B");
+
+    await recordUseCase.ExecuteAsync("beta-dashboard", new FeatureFlagExperimentOutcome
+    {
+      Variant = "A",
+      Converted = true,
+      HasError = false,
+      LatencyMs = 250
+    });
+    await recordUseCase.ExecuteAsync("beta-dashboard", new FeatureFlagExperimentOutcome
+    {
+      Variant = "A",
+      Converted = false,
+      HasError = true,
+      LatencyMs = 350
+    });
+    await recordUseCase.ExecuteAsync("beta-dashboard", new FeatureFlagExperimentOutcome
+    {
+      Variant = "B",
+      Converted = true,
+      HasError = false,
+      LatencyMs = 100
+    });
+    await recordUseCase.ExecuteAsync("beta-dashboard", new FeatureFlagExperimentOutcome
+    {
+      Variant = "B",
+      Converted = true,
+      HasError = false,
+      LatencyMs = 120
+    });
+
+    var recommendation = await recommendationUseCase.ExecuteAsync("beta-dashboard");
+
+    Assert.Equal(FeatureFlagExperimentRecommendationStatus.RecommendChallenger, recommendation.Status);
+    Assert.Equal("B", recommendation.RecommendedVariant);
+    Assert.Equal(2, recommendation.Baseline.SampleSize);
+    Assert.Equal(2, recommendation.Challenger.SampleSize);
+  }
+
+  [Fact]
   public async Task ScheduleFeatureFlagChangeUseCase_schedules_change_and_writes_activity_entry()
   {
     using var provider = CreateProvider(new FixedTimeProvider(new DateTimeOffset(2026, 5, 26, 10, 0, 0, TimeSpan.Zero)));

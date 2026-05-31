@@ -27,9 +27,10 @@ interface FeatureGridProps {
     readonly onHistory: (flag: FeatureFlag) => void;
     readonly onDelete: (flag: FeatureFlag) => void;
     readonly onActivity: (flag: FeatureFlag) => void;
+    readonly onExperiment?: (flag: FeatureFlag) => void;
 }
 
-export default function FeatureGrid({ flags, isLoading, onToggle, onEdit, onHistory, onDelete, onActivity }: FeatureGridProps) {
+export default function FeatureGrid({ flags, isLoading, onToggle, onEdit, onHistory, onDelete, onActivity, onExperiment }: FeatureGridProps) {
     const [search, setSearch] = useState('');
     const [status, setStatus] = useState<'all' | 'enabled' | 'disabled'>('all');
 
@@ -208,6 +209,18 @@ export default function FeatureGrid({ flags, isLoading, onToggle, onEdit, onHist
                                         >
                                             Activity
                                         </Button>
+                                        {onExperiment && (
+                                            <Button
+                                                variant="text"
+                                                size="small"
+                                                onClick={(event) => {
+                                                    event.stopPropagation();
+                                                    onExperiment(flag);
+                                                }}
+                                            >
+                                                Experiment
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="text"
                                             color="error"

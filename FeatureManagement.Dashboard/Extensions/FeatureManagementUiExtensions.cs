@@ -184,6 +184,14 @@ public static class FeatureManagementUiExtensions
       .RequireFeatureManagement(accessRequirement);
     group.MapPost("/{name}/schedule", FeatureFlagEndpointHandlers.ScheduleAsync)
       .RequireFeatureManagement(accessRequirement);
+    group.MapPut("/{name}/experiment", FeatureFlagEndpointHandlers.ConfigureExperimentAsync)
+      .RequireFeatureManagement(accessRequirement);
+    group.MapPost("/{name}/experiment/assign", FeatureFlagEndpointHandlers.AssignExperimentVariantAsync)
+      .RequireFeatureManagement(accessRequirement);
+    group.MapPost("/{name}/experiment/outcomes", FeatureFlagEndpointHandlers.RecordExperimentOutcomeAsync)
+      .RequireFeatureManagement(accessRequirement);
+    group.MapGet("/{name}/experiment/recommendation", FeatureFlagEndpointHandlers.GetExperimentRecommendationAsync)
+      .RequireFeatureManagement(accessRequirement);
     group.MapDelete("/{name}", FeatureFlagEndpointHandlers.DeleteAsync).RequireFeatureManagement(accessRequirement);
     return endpoints;
   }

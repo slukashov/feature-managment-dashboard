@@ -1,5 +1,6 @@
 using FeatureManagement.Dashboard.Infrastructure.Cache;
 using FeatureManagement.Dashboard.Infrastructure.Persistence;
+using FeatureManagement.Dashboard.Infrastructure.Providers;
 using FeatureManagement.Dashboard.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,10 +9,13 @@ namespace FeatureManagement.Dashboard.Infrastructure.UseCases.Implementations;
 internal sealed class ScheduleFeatureFlagChangeUseCase(
   IFeatureManagementContext context,
   FeatureFlagCacheState cacheState,
+  ICurrentUserProvider currentUserProvider,
   TimeProvider timeProvider) : IScheduleFeatureFlagChangeUseCase
 {
   public async Task<FeatureFlag> ExecuteAsync(string name, FeatureFlag flag, DateTime scheduledAtUtc, CancellationToken cancellationToken = default)
   {
+    var changedBy = currentUserProvider.GetCurrentUserOrSystem();
+
     var existing = await context.FeatureFlags
       .Include(f => f.EnabledFor)
       .FirstOrDefaultAsync(f => f.Name == name, cancellationToken);
@@ -21,7 +25,8 @@ internal sealed class ScheduleFeatureFlagChangeUseCase(
       throw new InvalidOperationException($"Feature flag '{name}' not found.");
     }
 
-    if (scheduledAtUtc <= DateTime.UtcNow)
+    var now = timeProvider.GetUtcNow().UtcDateTime;
+    if (scheduledAtUtc <= now)
     {
       throw new InvalidOperationException("Scheduled time must be in the future.");
     }
@@ -52,7 +57,7 @@ internal sealed class ScheduleFeatureFlagChangeUseCase(
       Description = $"Scheduled rollout for {scheduledAtUtc:u}",
       ChangeType = "ScheduledAtUtc",
       ChangedAtUtc = existing.UpdatedAtUtc,
-      ChangedBy = "system"
+      ChangedBy = changedBy
     };
 
     context.FeatureFlagActivityEntries.Add(activityEntry);

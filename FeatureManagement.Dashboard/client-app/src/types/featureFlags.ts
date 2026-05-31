@@ -34,5 +34,47 @@ export interface FeatureFlagActivityEntry {
     changedBy: string;
 }
 
+export interface FeatureFlagExperimentConfiguration {
+    baselineVariant: string;
+    challengerVariant: string;
+    baselineTrafficPercentage: number;
+    challengerTrafficPercentage: number;
+    conversionMetricName: string;
+    latencyMetricName: string;
+    minimumSampleSize: number;
+    isActive: boolean;
+}
+
+export interface FeatureFlagExperimentOutcome {
+    variant: string;
+    converted: boolean;
+    hasError: boolean;
+    latencyMs: number;
+}
+
+export interface FeatureFlagExperimentVariantAssignment {
+    variant: string;
+    bucket: number;
+}
+
+export interface FeatureFlagExperimentVariantSnapshot {
+    variant: string;
+    sampleSize: number;
+    conversionCount: number;
+    errorCount: number;
+    conversionRate: number;
+    errorRate: number;
+    averageLatencyMs: number;
+    score: number;
+}
+
+export interface FeatureFlagExperimentRecommendation {
+    status: number;
+    recommendedVariant?: string;
+    reason: string;
+    baseline: FeatureFlagExperimentVariantSnapshot;
+    challenger: FeatureFlagExperimentVariantSnapshot;
+}
+
 
 export type NotificationSeverity = 'success' | 'error' | 'info' | 'warning';

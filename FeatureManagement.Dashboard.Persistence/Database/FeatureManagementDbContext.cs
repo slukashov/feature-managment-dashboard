@@ -11,6 +11,8 @@ internal class FeatureManagementContext(DbContextOptions<FeatureManagementContex
   public DbSet<FeatureFilter> FeatureFilters => Set<FeatureFilter>();
   public DbSet<FeatureFlagAuditLog> FeatureFlagAuditLogs => Set<FeatureFlagAuditLog>();
   public DbSet<FeatureFlagActivityEntry> FeatureFlagActivityEntries => Set<FeatureFlagActivityEntry>();
+  public DbSet<FeatureFlagExperiment> FeatureFlagExperiments => Set<FeatureFlagExperiment>();
+  public DbSet<FeatureFlagExperimentVariantMetric> FeatureFlagExperimentVariantMetrics => Set<FeatureFlagExperimentVariantMetric>();
 
   protected override void OnModelCreating(ModelBuilder modelBuilder)
   {

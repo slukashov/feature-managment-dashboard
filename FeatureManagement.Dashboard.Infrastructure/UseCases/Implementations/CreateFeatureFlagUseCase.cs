@@ -1,6 +1,7 @@
 using FeatureManagement.Dashboard.Infrastructure.Cache;
 using FeatureManagement.Dashboard.Infrastructure.Exceptions;
 using FeatureManagement.Dashboard.Infrastructure.Persistence;
+using FeatureManagement.Dashboard.Infrastructure.Providers;
 using FeatureManagement.Dashboard.Models;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -11,10 +12,13 @@ internal sealed class CreateFeatureFlagUseCase(
   IFeatureManagementContext context,
   FeatureFlagCacheState cacheState,
   IValidator<FeatureFlag> validator,
+  ICurrentUserProvider currentUserProvider,
   TimeProvider timeProvider) : ICreateFeatureFlagUseCase
 {
   public async Task<FeatureFlag> ExecuteAsync(FeatureFlag flag, CancellationToken cancellationToken = default)
   {
+    var changedBy = currentUserProvider.GetCurrentUserOrSystem();
+
     var validation = await validator.ValidateAsync(flag, cancellationToken);
     if (!validation.IsValid)
       throw new ValidationException(validation.Errors);
@@ -42,7 +46,7 @@ internal sealed class CreateFeatureFlagUseCase(
       SnapshotVersion = flag.Version,
       SnapshotJson = FeatureFlagAuditSnapshotSerializer.Serialize(flag),
       ChangedAtUtc = flag.UpdatedAtUtc,
-      ChangedBy = "system"
+      ChangedBy = changedBy
     });
     context.FeatureFlagActivityEntries.Add(new FeatureFlagActivityEntry
     {
@@ -51,7 +55,7 @@ internal sealed class CreateFeatureFlagUseCase(
       Description = "Feature flag created.",
       ChangeType = null,
       ChangedAtUtc = flag.UpdatedAtUtc,
-      ChangedBy = "system"
+      ChangedBy = changedBy
     });
 
     await context.SaveChangesAsync(cancellationToken);

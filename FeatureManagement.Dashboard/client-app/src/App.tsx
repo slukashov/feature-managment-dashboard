@@ -19,6 +19,7 @@ import FeatureGrid from './components/FeatureGrid';
 import FeatureDialog from './components/FeatureDialog';
 import HistoryDialog from './components/HistoryDialog';
 import ActivityFeedDialog from './components/ActivityFeedDialog';
+import ExperimentDialog from './components/ExperimentDialog';
 import { useFeatureFlags } from './hooks/useFeatureFlags';
 import { FeatureFlag, FeatureFlagAuditLog, FeatureFlagActivityEntry, NotificationSeverity } from './types/featureFlags';
 
@@ -116,6 +117,8 @@ export default function App() {
      const [activityFeatureName, setActivityFeatureName] = useState<string>('');
      const [activityEntries, setActivityEntries] = useState<FeatureFlagActivityEntry[]>([]);
      const [isActivityLoading, setIsActivityLoading] = useState<boolean>(false);
+    const [experimentOpen, setExperimentOpen] = useState<boolean>(false);
+    const [experimentFeatureName, setExperimentFeatureName] = useState<string>('');
 
     // Notification State
     const [toast, setToast] = useState<ToastState>({ open: false, message: '', severity: 'success' });
@@ -125,7 +128,20 @@ export default function App() {
     }, []);
 
      // Custom Hook
-     const { flags, isLoading, saveFlag, toggleFlag, getAuditHistory, rollbackFlag, deleteFlag, getActivityFeed } = useFeatureFlags(showNotification);
+     const {
+         flags,
+         isLoading,
+         saveFlag,
+         toggleFlag,
+         getAuditHistory,
+         rollbackFlag,
+         deleteFlag,
+         getActivityFeed,
+         configureExperiment,
+         assignExperimentVariant,
+         recordExperimentOutcome,
+         getExperimentRecommendation
+     } = useFeatureFlags(showNotification);
 
     // Handlers
     const handleAddClick = () => {
@@ -196,6 +212,11 @@ export default function App() {
          setIsActivityLoading(false);
      };
 
+    const handleExperimentClick = (flag: FeatureFlag) => {
+        setExperimentFeatureName(flag.name);
+        setExperimentOpen(true);
+    };
+
     return (
         <ThemeProvider theme={theme}>
             <CssBaseline />
@@ -235,6 +256,7 @@ export default function App() {
                              onEdit={handleEditClick}
                              onHistory={handleHistoryClick}
                              onActivity={handleActivityClick}
+                             onExperiment={handleExperimentClick}
                              onDelete={handleDelete}
                          />
 
@@ -263,6 +285,16 @@ export default function App() {
                              isLoading={isActivityLoading}
                              onClose={() => setActivityOpen(false)}
                          />
+
+                        <ExperimentDialog
+                            open={experimentOpen}
+                            featureName={experimentFeatureName}
+                            onClose={() => setExperimentOpen(false)}
+                            onConfigure={configureExperiment}
+                            onAssign={assignExperimentVariant}
+                            onRecordOutcome={recordExperimentOutcome}
+                            onLoadRecommendation={getExperimentRecommendation}
+                        />
                     </Container>
 
                     <Snackbar

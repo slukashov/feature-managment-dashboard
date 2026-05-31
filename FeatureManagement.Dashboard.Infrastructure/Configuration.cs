@@ -5,6 +5,7 @@ using FeatureManagement.Dashboard.Infrastructure.UseCases.Implementations;
 using FeatureManagement.Dashboard.Infrastructure.Validators;
 using FeatureManagement.Dashboard.Models;
 using FluentValidation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.FeatureManagement;
 
@@ -25,9 +26,11 @@ public static class Configuration
   public static IServiceCollection AddInfrastructure(this IServiceCollection services)
   {
     services.AddFeatureManagement();
+    services.AddHttpContextAccessor();
     services.AddMemoryCache();
     services.AddSingleton<FeatureFlagCacheState>();
     services.AddSingleton<IFeatureDefinitionProvider, DatabaseFeatureDefinitionProvider>();
+    services.AddScoped<ICurrentUserProvider, CurrentUserProvider>();
     services.AddScoped<IValidator<FeatureFlag>, FeatureFlagValidator>();
     services.AddScoped<IGetAllFeatureFlagsUseCase, GetAllFeatureFlagsUseCase>();
     services.AddScoped<IGetFeatureFlagByNameUseCase, GetFeatureFlagByNameUseCase>();
@@ -37,6 +40,10 @@ public static class Configuration
     services.AddScoped<IRollbackFeatureFlagUseCase, RollbackFeatureFlagUseCase>();
     services.AddScoped<IDeleteFeatureFlagUseCase, DeleteFeatureFlagUseCase>();
     services.AddScoped<IGetFeatureFlagActivityFeedUseCase, GetFeatureFlagActivityFeedUseCase>();
+    services.AddScoped<IConfigureFeatureFlagExperimentUseCase, ConfigureFeatureFlagExperimentUseCase>();
+    services.AddScoped<IAssignFeatureFlagExperimentVariantUseCase, AssignFeatureFlagExperimentVariantUseCase>();
+    services.AddScoped<IRecordFeatureFlagExperimentOutcomeUseCase, RecordFeatureFlagExperimentOutcomeUseCase>();
+    services.AddScoped<IGetFeatureFlagExperimentRecommendationUseCase, GetFeatureFlagExperimentRecommendationUseCase>();
     return services.AddScoped<IScheduleFeatureFlagChangeUseCase, ScheduleFeatureFlagChangeUseCase>();
   }
 }

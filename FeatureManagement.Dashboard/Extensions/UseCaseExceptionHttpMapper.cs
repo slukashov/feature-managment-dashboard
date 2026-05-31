@@ -29,6 +29,15 @@ internal static class UseCaseExceptionHttpMapper
           currentVersion = versionConflictException.CurrentVersion
         });
         return true;
+      case FeatureFlagExperimentNotConfiguredException experimentNotConfiguredException:
+        result = Results.NotFound(new { error = experimentNotConfiguredException.Message });
+        return true;
+      case FeatureFlagExperimentInvalidVariantException invalidVariantException:
+        result = Results.BadRequest(new { error = invalidVariantException.Message });
+        return true;
+      case ArgumentException argumentException:
+        result = Results.BadRequest(new { error = argumentException.Message });
+        return true;
       default:
         result = null!;
         return false;

@@ -1,6 +1,7 @@
 using FeatureManagement.Dashboard.Infrastructure.Cache;
 using FeatureManagement.Dashboard.Infrastructure.Exceptions;
 using FeatureManagement.Dashboard.Infrastructure.Persistence;
+using FeatureManagement.Dashboard.Infrastructure.Providers;
 using FeatureManagement.Dashboard.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,10 +10,13 @@ namespace FeatureManagement.Dashboard.Infrastructure.UseCases.Implementations;
 internal sealed class RollbackFeatureFlagUseCase(
   IFeatureManagementContext context,
   FeatureFlagCacheState cacheState,
+  ICurrentUserProvider currentUserProvider,
   TimeProvider timeProvider) : IRollbackFeatureFlagUseCase
 {
   public async Task<FeatureFlag> ExecuteAsync(string name, int targetVersion, CancellationToken cancellationToken = default)
   {
+    var changedBy = currentUserProvider.GetCurrentUserOrSystem();
+
     var rollbackSource = await context.FeatureFlagAuditLogs
       .AsNoTracking()
       .Where(entry => entry.FeatureFlagName == name && entry.SnapshotVersion == targetVersion)
@@ -51,8 +55,8 @@ internal sealed class RollbackFeatureFlagUseCase(
       };
 
       context.FeatureFlags.Add(restored);
-      context.FeatureFlagAuditLogs.Add(CreateAuditLog(restored, FeatureFlagAuditAction.RolledBack, now));
-      context.FeatureFlagActivityEntries.Add(CreateActivityLog(name, targetVersion, now));
+      context.FeatureFlagAuditLogs.Add(CreateAuditLog(restored, FeatureFlagAuditAction.RolledBack, now, changedBy));
+      context.FeatureFlagActivityEntries.Add(CreateActivityLog(name, targetVersion, now, changedBy));
       await context.SaveChangesAsync(cancellationToken);
       cacheState.Bump();
       return restored;
@@ -71,14 +75,14 @@ internal sealed class RollbackFeatureFlagUseCase(
     existing.Version = nextVersion;
     existing.UpdatedAtUtc = now;
 
-    context.FeatureFlagAuditLogs.Add(CreateAuditLog(existing, FeatureFlagAuditAction.RolledBack, now));
-    context.FeatureFlagActivityEntries.Add(CreateActivityLog(name, targetVersion, now));
+    context.FeatureFlagAuditLogs.Add(CreateAuditLog(existing, FeatureFlagAuditAction.RolledBack, now, changedBy));
+    context.FeatureFlagActivityEntries.Add(CreateActivityLog(name, targetVersion, now, changedBy));
     await context.SaveChangesAsync(cancellationToken);
     cacheState.Bump();
     return existing;
   }
 
-  private static FeatureFlagAuditLog CreateAuditLog(FeatureFlag flag, FeatureFlagAuditAction action, DateTime changedAtUtc)
+  private static FeatureFlagAuditLog CreateAuditLog(FeatureFlag flag, FeatureFlagAuditAction action, DateTime changedAtUtc, string changedBy)
     => new()
     {
       FeatureFlagName = flag.Name,
@@ -86,10 +90,10 @@ internal sealed class RollbackFeatureFlagUseCase(
       SnapshotVersion = flag.Version,
       SnapshotJson = FeatureFlagAuditSnapshotSerializer.Serialize(flag),
       ChangedAtUtc = changedAtUtc,
-      ChangedBy = "system"
+      ChangedBy = changedBy
     };
 
-  private static FeatureFlagActivityEntry CreateActivityLog(string featureFlagName, int targetVersion, DateTime changedAtUtc)
+  private static FeatureFlagActivityEntry CreateActivityLog(string featureFlagName, int targetVersion, DateTime changedAtUtc, string changedBy)
     => new()
     {
       FeatureFlagName = featureFlagName,
@@ -97,7 +101,7 @@ internal sealed class RollbackFeatureFlagUseCase(
       Description = $"Feature flag rolled back to version {targetVersion}.",
       ChangeType = "Version",
       ChangedAtUtc = changedAtUtc,
-      ChangedBy = "system"
+      ChangedBy = changedBy
     };
 }
 

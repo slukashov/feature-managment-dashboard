@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { featureFlagsApi } from '../api/featureFlagsApi';
-import { FeatureFlag, FeatureFlagAuditLog, FeatureFlagActivityEntry, NotificationSeverity } from '../types/featureFlags';
+import {
+    FeatureFlag,
+    FeatureFlagAuditLog,
+    FeatureFlagActivityEntry,
+    FeatureFlagExperimentConfiguration,
+    FeatureFlagExperimentOutcome,
+    FeatureFlagExperimentRecommendation,
+    FeatureFlagExperimentVariantAssignment,
+    NotificationSeverity
+} from '../types/featureFlags';
 
 type ShowNotificationFn = (message: string, severity: NotificationSeverity) => void;
 
@@ -127,5 +136,64 @@ export const useFeatureFlags = (showNotification: ShowNotificationFn) => {
         }
     };
 
-    return { flags, isLoading, fetchFlags, saveFlag, toggleFlag, getAuditHistory, rollbackFlag, deleteFlag, getActivityFeed, scheduleChange };
+    const configureExperiment = async (name: string, configuration: FeatureFlagExperimentConfiguration): Promise<boolean> => {
+        try {
+            await featureFlagsApi.configureExperiment(name, configuration);
+            showNotification(`Experiment configured for ${name}.`, 'success');
+            return true;
+        } catch (error: unknown) {
+            logUnexpectedError('configureExperiment failed', error);
+            showNotification('Failed to configure experiment.', 'error');
+            return false;
+        }
+    };
+
+    const assignExperimentVariant = async (name: string, subjectKey: string): Promise<FeatureFlagExperimentVariantAssignment | null> => {
+        try {
+            return await featureFlagsApi.assignExperimentVariant(name, subjectKey);
+        } catch (error: unknown) {
+            logUnexpectedError('assignExperimentVariant failed', error);
+            showNotification('Failed to assign experiment variant.', 'error');
+            return null;
+        }
+    };
+
+    const recordExperimentOutcome = async (name: string, outcome: FeatureFlagExperimentOutcome): Promise<boolean> => {
+        try {
+            await featureFlagsApi.recordExperimentOutcome(name, outcome);
+            showNotification('Experiment outcome recorded.', 'success');
+            return true;
+        } catch (error: unknown) {
+            logUnexpectedError('recordExperimentOutcome failed', error);
+            showNotification('Failed to record experiment outcome.', 'error');
+            return false;
+        }
+    };
+
+    const getExperimentRecommendation = async (name: string): Promise<FeatureFlagExperimentRecommendation | null> => {
+        try {
+            return await featureFlagsApi.getExperimentRecommendation(name);
+        } catch (error: unknown) {
+            logUnexpectedError('getExperimentRecommendation failed', error);
+            showNotification('Failed to load experiment recommendation.', 'error');
+            return null;
+        }
+    };
+
+    return {
+        flags,
+        isLoading,
+        fetchFlags,
+        saveFlag,
+        toggleFlag,
+        getAuditHistory,
+        rollbackFlag,
+        deleteFlag,
+        getActivityFeed,
+        scheduleChange,
+        configureExperiment,
+        assignExperimentVariant,
+        recordExperimentOutcome,
+        getExperimentRecommendation
+    };
 };

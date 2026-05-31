@@ -126,6 +126,69 @@ internal static class FeatureFlagEndpointHandlers
       return result;
     }
   }
+
+  public static async Task<IResult> ConfigureExperimentAsync(
+    IConfigureFeatureFlagExperimentUseCase useCase,
+    string name,
+    FeatureFlagExperimentConfiguration configuration)
+  {
+    try
+    {
+      var experiment = await useCase.ExecuteAsync(name, configuration);
+      return Results.Ok(experiment);
+    }
+    catch (Exception ex) when (UseCaseExceptionHttpMapper.TryMap(ex, out var result))
+    {
+      return result;
+    }
+  }
+
+  public static async Task<IResult> AssignExperimentVariantAsync(
+    IAssignFeatureFlagExperimentVariantUseCase useCase,
+    string name,
+    AssignExperimentVariantRequest request)
+  {
+    try
+    {
+      var assignment = await useCase.ExecuteAsync(name, request.SubjectKey);
+      return Results.Ok(assignment);
+    }
+    catch (Exception ex) when (UseCaseExceptionHttpMapper.TryMap(ex, out var result))
+    {
+      return result;
+    }
+  }
+
+  public static async Task<IResult> RecordExperimentOutcomeAsync(
+    IRecordFeatureFlagExperimentOutcomeUseCase useCase,
+    string name,
+    FeatureFlagExperimentOutcome outcome)
+  {
+    try
+    {
+      await useCase.ExecuteAsync(name, outcome);
+      return Results.NoContent();
+    }
+    catch (Exception ex) when (UseCaseExceptionHttpMapper.TryMap(ex, out var result))
+    {
+      return result;
+    }
+  }
+
+  public static async Task<IResult> GetExperimentRecommendationAsync(
+    IGetFeatureFlagExperimentRecommendationUseCase useCase,
+    string name)
+  {
+    try
+    {
+      var recommendation = await useCase.ExecuteAsync(name);
+      return Results.Ok(recommendation);
+    }
+    catch (Exception ex) when (UseCaseExceptionHttpMapper.TryMap(ex, out var result))
+    {
+      return result;
+    }
+  }
 }
 
 /// <summary>
@@ -135,5 +198,10 @@ public class ScheduleFeatureFlagRequest
 {
   public required FeatureFlag Flag { get; set; }
   public required DateTime ScheduledAtUtc { get; set; }
+}
+
+public class AssignExperimentVariantRequest
+{
+  public required string SubjectKey { get; set; }
 }
 

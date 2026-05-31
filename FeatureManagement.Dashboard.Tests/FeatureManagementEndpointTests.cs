@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Security.Claims;
 using System.Text.Json;
 using FeatureManagement.Dashboard.Infrastructure.Persistence;
 using FeatureManagement.Dashboard.Models;
@@ -496,6 +497,8 @@ public sealed class FeatureManagementEndpointTests
     Assert.Equal(2, auditJson.RootElement.GetArrayLength());
     Assert.Equal((int)FeatureFlagAuditAction.Updated, auditJson.RootElement[0].GetProperty("action").GetInt32());
     Assert.Equal((int)FeatureFlagAuditAction.Created, auditJson.RootElement[1].GetProperty("action").GetInt32());
+    Assert.Equal("test-user@example.com", auditJson.RootElement[0].GetProperty("changedBy").GetString());
+    Assert.Equal("test-user@example.com", auditJson.RootElement[1].GetProperty("changedBy").GetString());
 
     var rollbackResponse = await app.Client.PostAsync("/api/feature-flags/beta-dashboard/rollback/1", null);
     Assert.Equal(HttpStatusCode.OK, rollbackResponse.StatusCode);
@@ -506,6 +509,12 @@ public sealed class FeatureManagementEndpointTests
     var flagJson = Assert.Single(flagsJson.RootElement.EnumerateArray());
     Assert.Equal(3, flagJson.GetProperty("version").GetInt32());
     Assert.Equal("{\"Value\":10}", flagJson.GetProperty("enabledFor")[0].GetProperty("parametersJson").GetString());
+
+    var activityResponse = await app.Client.GetAsync("/api/feature-flags/beta-dashboard/activity");
+    Assert.Equal(HttpStatusCode.OK, activityResponse.StatusCode);
+    var activityBody = await activityResponse.Content.ReadAsStringAsync();
+    using var activityJson = JsonDocument.Parse(activityBody);
+    Assert.Equal("test-user@example.com", activityJson.RootElement[0].GetProperty("changedBy").GetString());
   }
 
   [Fact]
@@ -802,6 +811,83 @@ public sealed class FeatureManagementEndpointTests
   }
 
   [Fact]
+  public async Task Api_supports_experiment_mode_with_outcome_tracking_and_recommendation()
+  {
+    await using var app = await FeatureManagementTestHost.CreateAsync(new AllowAllAccessRequirement());
+
+    var createResponse = await PostFlagAsync(app.Client, new FeatureFlag
+    {
+      Name = "checkout-flow",
+      RequirementType = RequirementType.Any,
+      EnabledFor =
+      [
+        new FeatureFilter
+        {
+          Name = "Microsoft.Percentage",
+          ParametersJson = "{\"Value\":25}"
+        }
+      ]
+    });
+    Assert.Equal(HttpStatusCode.OK, createResponse.StatusCode);
+
+    var configureResponse = await app.Client.PutAsJsonAsync("/api/feature-flags/checkout-flow/experiment", new FeatureFlagExperimentConfiguration
+    {
+      BaselineVariant = "A",
+      ChallengerVariant = "B",
+      BaselineTrafficPercentage = 50,
+      ChallengerTrafficPercentage = 50,
+      ConversionMetricName = "checkout_conversion",
+      LatencyMetricName = "checkout_latency_ms",
+      MinimumSampleSize = 2,
+      IsActive = true
+    });
+    Assert.Equal(HttpStatusCode.OK, configureResponse.StatusCode);
+
+    var assignResponse = await app.Client.PostAsJsonAsync("/api/feature-flags/checkout-flow/experiment/assign", new AssignExperimentVariantRequest
+    {
+      SubjectKey = "user-123"
+    });
+    Assert.Equal(HttpStatusCode.OK, assignResponse.StatusCode);
+
+    await app.Client.PostAsJsonAsync("/api/feature-flags/checkout-flow/experiment/outcomes", new FeatureFlagExperimentOutcome
+    {
+      Variant = "A",
+      Converted = true,
+      HasError = false,
+      LatencyMs = 250
+    });
+    await app.Client.PostAsJsonAsync("/api/feature-flags/checkout-flow/experiment/outcomes", new FeatureFlagExperimentOutcome
+    {
+      Variant = "A",
+      Converted = false,
+      HasError = true,
+      LatencyMs = 350
+    });
+    await app.Client.PostAsJsonAsync("/api/feature-flags/checkout-flow/experiment/outcomes", new FeatureFlagExperimentOutcome
+    {
+      Variant = "B",
+      Converted = true,
+      HasError = false,
+      LatencyMs = 100
+    });
+    await app.Client.PostAsJsonAsync("/api/feature-flags/checkout-flow/experiment/outcomes", new FeatureFlagExperimentOutcome
+    {
+      Variant = "B",
+      Converted = true,
+      HasError = false,
+      LatencyMs = 120
+    });
+
+    var recommendationResponse = await app.Client.GetAsync("/api/feature-flags/checkout-flow/experiment/recommendation");
+    Assert.Equal(HttpStatusCode.OK, recommendationResponse.StatusCode);
+    var recommendationBody = await recommendationResponse.Content.ReadAsStringAsync();
+    using var recommendationJson = JsonDocument.Parse(recommendationBody);
+    Assert.Equal((int)FeatureFlagExperimentRecommendationStatus.RecommendChallenger,
+      recommendationJson.RootElement.GetProperty("status").GetInt32());
+    Assert.Equal("B", recommendationJson.RootElement.GetProperty("recommendedVariant").GetString());
+  }
+
+  [Fact]
   public async Task Api_and_ui_support_custom_route_prefixes()
   {
     const string apiRoutePrefix = "/api/flags";
@@ -933,6 +1019,15 @@ public sealed class FeatureManagementEndpointTests
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
   {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
-      => Task.FromResult(AuthenticateResult.NoResult());
+    {
+      var identity = new ClaimsIdentity(
+      [
+        new Claim(ClaimTypes.Email, "test-user@example.com"),
+        new Claim(ClaimTypes.Name, "test-user")
+      ], "TestScheme");
+      var principal = new ClaimsPrincipal(identity);
+      var ticket = new AuthenticationTicket(principal, "TestScheme");
+      return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
   }
 }

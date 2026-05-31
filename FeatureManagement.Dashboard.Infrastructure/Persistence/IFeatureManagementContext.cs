@@ -43,6 +43,16 @@ public interface IFeatureManagementContext
   DbSet<FeatureFlagActivityEntry> FeatureFlagActivityEntries { get; }
 
   /// <summary>
+  /// Represents configured A/B experiments attached to feature flags.
+  /// </summary>
+  DbSet<FeatureFlagExperiment> FeatureFlagExperiments { get; }
+
+  /// <summary>
+  /// Represents per-variant experiment metric aggregates used for recommendations.
+  /// </summary>
+  DbSet<FeatureFlagExperimentVariantMetric> FeatureFlagExperimentVariantMetrics { get; }
+
+  /// <summary>
   /// Provides access to database-specific functionality for the feature management context.
   /// </summary>
   /// <remarks>

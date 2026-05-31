@@ -1,6 +1,7 @@
 using FeatureManagement.Dashboard.Infrastructure.Cache;
 using FeatureManagement.Dashboard.Infrastructure.Exceptions;
 using FeatureManagement.Dashboard.Infrastructure.Persistence;
+using FeatureManagement.Dashboard.Infrastructure.Providers;
 using FeatureManagement.Dashboard.Models;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -12,10 +13,13 @@ internal sealed class UpdateFeatureFlagUseCase(
   IFeatureManagementContext context,
   FeatureFlagCacheState cacheState,
   IValidator<FeatureFlag> validator,
+  ICurrentUserProvider currentUserProvider,
   TimeProvider timeProvider) : IUpdateFeatureFlagUseCase
 {
   public async Task ExecuteAsync(string name, FeatureFlag updatedFlag, CancellationToken cancellationToken = default)
   {
+    var changedBy = currentUserProvider.GetCurrentUserOrSystem();
+
     var validation = await validator.ValidateAsync(updatedFlag, cancellationToken);
     if (!validation.IsValid)
       throw new ValidationException(validation.Errors);
@@ -78,7 +82,7 @@ internal sealed class UpdateFeatureFlagUseCase(
       SnapshotVersion = existing.Version,
       SnapshotJson = FeatureFlagAuditSnapshotSerializer.Serialize(existing),
       ChangedAtUtc = existing.UpdatedAtUtc,
-      ChangedBy = "system"
+      ChangedBy = changedBy
     });
     context.FeatureFlagActivityEntries.Add(new FeatureFlagActivityEntry
     {
@@ -87,7 +91,7 @@ internal sealed class UpdateFeatureFlagUseCase(
       Description = BuildUpdateDescription(changedFields),
       ChangeType = changedFields.Count == 0 ? "General" : string.Join(",", changedFields),
       ChangedAtUtc = existing.UpdatedAtUtc,
-      ChangedBy = "system"
+      ChangedBy = changedBy
     });
 
     try

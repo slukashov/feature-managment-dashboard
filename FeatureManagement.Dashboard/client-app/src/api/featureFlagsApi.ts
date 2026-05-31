@@ -1,5 +1,13 @@
 import axios from 'axios';
-import { FeatureFlag, FeatureFlagAuditLog, FeatureFlagActivityEntry } from '../types/featureFlags';
+import {
+    FeatureFlag,
+    FeatureFlagAuditLog,
+    FeatureFlagActivityEntry,
+    FeatureFlagExperimentConfiguration,
+    FeatureFlagExperimentOutcome,
+    FeatureFlagExperimentRecommendation,
+    FeatureFlagExperimentVariantAssignment
+} from '../types/featureFlags';
 
 const API_BASE = '/api/feature-flags';
 
@@ -42,6 +50,29 @@ export const featureFlagsApi = {
             flag,
             scheduledAtUtc
         });
+        return response.data;
+    },
+    configureExperiment: async (
+        name: string,
+        configuration: FeatureFlagExperimentConfiguration
+    ): Promise<FeatureFlagExperimentConfiguration> => {
+        const response = await axios.put<FeatureFlagExperimentConfiguration>(`${API_BASE}/${name}/experiment`, configuration);
+        return response.data;
+    },
+    assignExperimentVariant: async (
+        name: string,
+        subjectKey: string
+    ): Promise<FeatureFlagExperimentVariantAssignment> => {
+        const response = await axios.post<FeatureFlagExperimentVariantAssignment>(`${API_BASE}/${name}/experiment/assign`, {
+            subjectKey
+        });
+        return response.data;
+    },
+    recordExperimentOutcome: async (name: string, outcome: FeatureFlagExperimentOutcome): Promise<void> => {
+        await axios.post(`${API_BASE}/${name}/experiment/outcomes`, outcome);
+    },
+    getExperimentRecommendation: async (name: string): Promise<FeatureFlagExperimentRecommendation> => {
+        const response = await axios.get<FeatureFlagExperimentRecommendation>(`${API_BASE}/${name}/experiment/recommendation`);
         return response.data;
     }
 };

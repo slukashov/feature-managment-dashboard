@@ -1,6 +1,7 @@
 using FeatureManagement.Dashboard.Infrastructure.Cache;
 using FeatureManagement.Dashboard.Infrastructure.Exceptions;
 using FeatureManagement.Dashboard.Infrastructure.Persistence;
+using FeatureManagement.Dashboard.Infrastructure.Providers;
 using FeatureManagement.Dashboard.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -9,10 +10,13 @@ namespace FeatureManagement.Dashboard.Infrastructure.UseCases.Implementations;
 internal sealed class DeleteFeatureFlagUseCase(
   IFeatureManagementContext context,
   FeatureFlagCacheState cacheState,
+  ICurrentUserProvider currentUserProvider,
   TimeProvider timeProvider) : IDeleteFeatureFlagUseCase
 {
   public async Task ExecuteAsync(string name, CancellationToken cancellationToken = default)
   {
+    var changedBy = currentUserProvider.GetCurrentUserOrSystem();
+
     var flag = await context.FeatureFlags
       .Include(featureFlag => featureFlag.EnabledFor)
       .FirstOrDefaultAsync(featureFlag => featureFlag.Name == name, cancellationToken);
@@ -27,7 +31,7 @@ internal sealed class DeleteFeatureFlagUseCase(
       SnapshotVersion = flag.Version,
       SnapshotJson = FeatureFlagAuditSnapshotSerializer.Serialize(flag),
       ChangedAtUtc = timeProvider.GetUtcNow().UtcDateTime,
-      ChangedBy = "system"
+      ChangedBy = changedBy
     });
     context.FeatureFlagActivityEntries.Add(new FeatureFlagActivityEntry
     {
@@ -36,7 +40,7 @@ internal sealed class DeleteFeatureFlagUseCase(
       Description = "Feature flag deleted.",
       ChangeType = "Deleted",
       ChangedAtUtc = timeProvider.GetUtcNow().UtcDateTime,
-      ChangedBy = "system"
+      ChangedBy = changedBy
     });
 
     context.FeatureFlags.Remove(flag);
